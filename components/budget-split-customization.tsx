@@ -174,6 +174,12 @@ export function BudgetSplitCustomization({ userId, onSplitChange }: BudgetSplitC
     setMessage(null)
 
     try {
+      if (total !== 100) {
+        setMessage({ type: "error", text: "Budget percentages must add up to 100%" })
+        setIsSaving(false)
+        return
+      }
+
       const { error } = await supabase
         .from("profiles")
         .update({
@@ -184,13 +190,21 @@ export function BudgetSplitCustomization({ userId, onSplitChange }: BudgetSplitC
         })
         .eq("id", user.id)
 
-      if (error) throw error
+      if (error) {
+        console.error("Database error:", error)
+        throw new Error(`Database error: ${error.message}`)
+      }
 
       setMessage({ type: "success", text: "Budget split saved successfully! Changes will reflect across all pages." })
       onSplitChange?.(currentSplit)
+
+      setTimeout(() => {
+        window.location.reload()
+      }, 1500)
     } catch (error) {
       console.error("Error saving budget split:", error)
-      setMessage({ type: "error", text: "Failed to save budget split" })
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
+      setMessage({ type: "error", text: `Failed to save budget split: ${errorMessage}` })
     } finally {
       setIsSaving(false)
     }

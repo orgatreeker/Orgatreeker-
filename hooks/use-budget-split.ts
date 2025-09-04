@@ -39,7 +39,15 @@ export function useBudgetSplit() {
         .eq("id", user.id)
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.log("Profile data not found or columns missing, using defaults:", error)
+        setBudgetSplit({
+          needs_percentage: 50,
+          wants_percentage: 30,
+          savings_percentage: 20,
+        })
+        return
+      }
 
       if (data) {
         setBudgetSplit({
@@ -51,6 +59,11 @@ export function useBudgetSplit() {
     } catch (error) {
       console.error("Error fetching budget split:", error)
       setError("Failed to load budget preferences")
+      setBudgetSplit({
+        needs_percentage: 50,
+        wants_percentage: 30,
+        savings_percentage: 20,
+      })
     } finally {
       setIsLoading(false)
     }
@@ -58,6 +71,7 @@ export function useBudgetSplit() {
 
   const refreshBudgetSplit = () => {
     setIsLoading(true)
+    setError(null)
     fetchBudgetSplit()
   }
 
