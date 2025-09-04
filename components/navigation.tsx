@@ -224,14 +224,25 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         <div className="hidden md:block">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 md:h-10 md:w-10 rounded-full">
+              <Button
+                variant="ghost"
+                className="relative h-8 w-8 md:h-10 md:w-10 rounded-full hover:bg-accent"
+                onClick={() => console.log("[v0] Profile dropdown clicked")}
+              >
                 <Avatar className="h-8 w-8 md:h-10 md:w-10">
                   <AvatarImage src="/placeholder.svg?height=40&width=40" alt="Profile" />
-                  <AvatarFallback className="text-xs md:text-sm">{getUserInitials()}</AvatarFallback>
+                  <AvatarFallback className="text-xs md:text-sm bg-primary text-primary-foreground">
+                    {getUserInitials()}
+                  </AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
+            <DropdownMenuContent
+              className="w-56 bg-background border border-border shadow-lg z-50"
+              align="end"
+              forceMount
+              sideOffset={5}
+            >
               {user && (
                 <>
                   <div className="flex flex-col space-y-1 p-2">
@@ -241,15 +252,33 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                   <DropdownMenuSeparator />
                 </>
               )}
-              <DropdownMenuItem onClick={handleProfileNavigation}>
+              <DropdownMenuItem
+                onClick={() => {
+                  console.log("[v0] Profile Settings clicked")
+                  handleProfileNavigation()
+                }}
+                className="cursor-pointer hover:bg-accent"
+              >
                 <User className="mr-2 h-4 w-4" />
                 <span>Profile Settings</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleAccountNavigation}>
+              <DropdownMenuItem
+                onClick={() => {
+                  console.log("[v0] Account Settings clicked")
+                  handleAccountNavigation()
+                }}
+                className="cursor-pointer hover:bg-accent"
+              >
                 <Settings className="mr-2 h-4 w-4" />
                 <span>Account Settings</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleBillingNavigation}>
+              <DropdownMenuItem
+                onClick={() => {
+                  console.log("[v0] Billing Settings clicked")
+                  handleBillingNavigation()
+                }}
+                className="cursor-pointer hover:bg-accent"
+              >
                 <CreditCard className="mr-2 h-4 w-4" />
                 <span>Billing Settings</span>
               </DropdownMenuItem>
