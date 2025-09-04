@@ -9,6 +9,7 @@ import { IncomePage } from "@/components/income-page"
 import { BudgetPage } from "@/components/budget-page"
 import { SettingsPage } from "@/components/settings-page"
 import { ProfileSettingsPage } from "@/components/profile-settings-page"
+import { AccountSettingsPage } from "@/components/account-settings-page"
 
 export default function AppPage() {
   const [activeTab, setActiveTab] = useState("dashboard")
@@ -114,6 +115,8 @@ export default function AppPage() {
         return <SettingsPage />
       case "profile":
         return <ProfileSettingsPage onBack={() => setActiveTab("dashboard")} />
+      case "account":
+        return <AccountSettingsPage onBack={() => setActiveTab("dashboard")} />
       case "billing":
         return <ProfileSettingsPage onBack={() => setActiveTab("dashboard")} />
       default:

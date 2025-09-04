@@ -13,7 +13,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { User, CreditCard, Menu } from "lucide-react"
+import { User, CreditCard, Menu, Settings } from "lucide-react"
 import { LogoutButton } from "@/components/logout-button"
 import { getProfile, createProfile, type Profile } from "@/lib/profile-utils"
 
@@ -115,6 +115,10 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
     onTabChange("profile")
   }
 
+  const handleAccountNavigation = () => {
+    onTabChange("account")
+  }
+
   const handleBillingNavigation = () => {
     onTabChange("billing")
   }
@@ -198,11 +202,15 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                     </div>
                     <Button variant="ghost" className="w-full justify-start" onClick={handleProfileNavigation}>
                       <User className="mr-2 h-4 w-4" />
-                      Profile
+                      Profile Settings
+                    </Button>
+                    <Button variant="ghost" className="w-full justify-start" onClick={handleAccountNavigation}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      Account Settings
                     </Button>
                     <Button variant="ghost" className="w-full justify-start" onClick={handleBillingNavigation}>
                       <CreditCard className="mr-2 h-4 w-4" />
-                      Billing
+                      Billing Settings
                     </Button>
                     <LogoutButton className="w-full justify-start text-destructive" />
                   </div>
@@ -235,11 +243,15 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
               )}
               <DropdownMenuItem onClick={handleProfileNavigation}>
                 <User className="mr-2 h-4 w-4" />
-                <span>Profile</span>
+                <span>Profile Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleAccountNavigation}>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Account Settings</span>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleBillingNavigation}>
                 <CreditCard className="mr-2 h-4 w-4" />
-                <span>Billing</span>
+                <span>Billing Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <LogoutButton variant="dropdown" />
