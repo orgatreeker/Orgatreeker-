@@ -226,7 +226,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="relative h-8 w-8 md:h-10 md:w-10 rounded-full hover:bg-accent"
+                className="relative h-8 w-8 md:h-10 md:w-10 rounded-full hover:bg-accent transition-colors"
                 onClick={() => console.log("[v0] Profile dropdown clicked")}
               >
                 <Avatar className="h-8 w-8 md:h-10 md:w-10">
@@ -238,18 +238,19 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
-              className="w-56 bg-background border border-border shadow-lg z-50"
+              className="w-56 bg-popover border border-border shadow-lg rounded-lg z-[100] p-1"
               align="end"
               forceMount
-              sideOffset={5}
+              sideOffset={8}
+              side="bottom"
             >
               {user && (
                 <>
-                  <div className="flex flex-col space-y-1 p-2">
-                    <p className="text-sm font-medium leading-none">{getUserDisplayName()}</p>
-                    <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                  <div className="flex flex-col space-y-1 p-3 bg-muted/50 rounded-md mx-1 mb-1">
+                    <p className="text-sm font-medium leading-none text-foreground">{getUserDisplayName()}</p>
+                    <p className="text-xs leading-none text-muted-foreground truncate">{user.email}</p>
                   </div>
-                  <DropdownMenuSeparator />
+                  <DropdownMenuSeparator className="my-1" />
                 </>
               )}
               <DropdownMenuItem
@@ -257,33 +258,38 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                   console.log("[v0] Profile Settings clicked")
                   handleProfileNavigation()
                 }}
-                className="cursor-pointer hover:bg-accent"
+                className="cursor-pointer hover:bg-accent focus:bg-accent rounded-md mx-1 my-0.5 flex items-center gap-2 p-2"
               >
-                <User className="mr-2 h-4 w-4" />
-                <span>Profile Settings</span>
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Profile Settings</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
                   console.log("[v0] Account Settings clicked")
                   handleAccountNavigation()
                 }}
-                className="cursor-pointer hover:bg-accent"
+                className="cursor-pointer hover:bg-accent focus:bg-accent rounded-md mx-1 my-0.5 flex items-center gap-2 p-2"
               >
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Account Settings</span>
+                <Settings className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Account Settings</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => {
                   console.log("[v0] Billing Settings clicked")
                   handleBillingNavigation()
                 }}
-                className="cursor-pointer hover:bg-accent"
+                className="cursor-pointer hover:bg-accent focus:bg-accent rounded-md mx-1 my-0.5 flex items-center gap-2 p-2"
               >
-                <CreditCard className="mr-2 h-4 w-4" />
-                <span>Billing Settings</span>
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm">Billing Settings</span>
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <LogoutButton variant="dropdown" />
+              <DropdownMenuSeparator className="my-1" />
+              <div className="mx-1 my-0.5">
+                <LogoutButton
+                  variant="dropdown"
+                  className="w-full justify-start hover:bg-destructive/10 hover:text-destructive rounded-md"
+                />
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
