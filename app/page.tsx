@@ -11,7 +11,6 @@ import { SettingsPage } from "@/components/settings-page"
 import { ProfileSettingsPage } from "@/components/profile-settings-page"
 import { AccountSettingsPage } from "@/components/account-settings-page"
 import { BillingSettingsPage } from "@/components/billing-settings-page"
-import { ErrorBoundary } from "@/components/error-boundary"
 
 export default function AppPage() {
   const [activeTab, setActiveTab] = useState("dashboard")
@@ -25,27 +24,15 @@ export default function AppPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        console.log("[v0] Starting authentication check...")
-
         const {
           data: { session },
           error: sessionError,
         } = await supabase.auth.getSession()
 
-        if (sessionError) {
-          console.error("[v0] Session error:", sessionError)
-          setError("Authentication failed. Please try logging in again.")
+        if (sessionError || !session) {
           router.push("/auth")
           return
         }
-
-        if (!session) {
-          console.log("[v0] No session found, redirecting to auth")
-          router.push("/auth")
-          return
-        }
-
-        console.log("[v0] Session found, checking profile...")
 
         try {
           const { data: profile, error: profileError } = await supabase
@@ -55,40 +42,21 @@ export default function AppPage() {
             .single()
 
           if (profileError && profileError.code === "PGRST116") {
-            console.log("[v0] Profile not found, creating new profile...")
-            const { error: insertError } = await supabase.from("profiles").insert({
+            await supabase.from("profiles").insert({
               id: session.user.id,
               email: session.user.email,
-              full_name:
-                session.user.user_metadata?.full_name ||
-                session.user.user_metadata?.name ||
-                `${session.user.user_metadata?.first_name || ""} ${session.user.user_metadata?.last_name || ""}`.trim() ||
-                "",
+              full_name: session.user.user_metadata?.full_name || "",
             })
-
-            if (insertError) {
-              console.error("[v0] Error creating profile:", insertError)
-              setError("Failed to create user profile. Please try again.")
-              return
-            }
-          } else if (profileError) {
-            console.error("[v0] Profile fetch error:", profileError)
-            // Don't fail completely, just log the error
-            console.log("[v0] Continuing without profile data")
           }
         } catch (profileErr) {
-          console.error("[v0] Profile operation failed:", profileErr)
-          // Continue without failing the entire auth flow
+          // Continue without failing
         }
 
-        console.log("[v0] Authentication successful")
         setUser(session.user)
         setIsAuthenticated(true)
         setError(null)
       } catch (error) {
-        console.error("[v0] Critical auth error:", error)
-        setError("A critical error occurred. Please refresh the page.")
-        // Don't redirect on critical errors, show error state instead
+        setError("Authentication failed. Please refresh the page.")
       } finally {
         setIsLoading(false)
       }
@@ -99,21 +67,13 @@ export default function AppPage() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      try {
-        console.log("[v0] Auth state change:", event)
-        if (event === "SIGNED_OUT" || !session) {
-          setIsAuthenticated(false)
-          setUser(null)
-          setError(null)
-          router.push("/auth")
-        } else if (event === "SIGNED_IN" && session) {
-          setUser(session.user)
-          setIsAuthenticated(true)
-          setError(null)
-        }
-      } catch (error) {
-        console.error("[v0] Auth state change error:", error)
-        setError("Authentication state error occurred.")
+      if (event === "SIGNED_OUT" || !session) {
+        setIsAuthenticated(false)
+        setUser(null)
+        router.push("/auth")
+      } else if (event === "SIGNED_IN" && session) {
+        setUser(session.user)
+        setIsAuthenticated(true)
       }
     })
 
@@ -148,49 +108,36 @@ export default function AppPage() {
   }
 
   if (!isAuthenticated) {
-    return null // Will redirect to auth
+    return null
   }
 
   const renderContent = () => {
-    try {
-      switch (activeTab) {
-        case "dashboard":
-          return <DashboardPage isPremium={false} />
-        case "income":
-          return <IncomePage isPremium={false} />
-        case "budget":
-          return <BudgetPage isPremium={false} />
-        case "settings":
-          return <SettingsPage />
-        case "profile":
-          return <ProfileSettingsPage onBack={() => setActiveTab("dashboard")} />
-        case "account":
-          return <AccountSettingsPage onBack={() => setActiveTab("dashboard")} />
-        case "billing":
-          return <BillingSettingsPage onBack={() => setActiveTab("dashboard")} />
-        default:
-          return <DashboardPage isPremium={false} />
-      }
-    } catch (error) {
-      console.error("[v0] Content rendering error:", error)
-      return (
-        <div className="text-center py-8">
-          <p className="text-destructive">Failed to load content. Please try refreshing the page.</p>
-        </div>
-      )
+    switch (activeTab) {
+      case "dashboard":
+        return <DashboardPage isPremium={false} />
+      case "income":
+        return <IncomePage isPremium={false} />
+      case "budget":
+        return <BudgetPage isPremium={false} />
+      case "settings":
+        return <SettingsPage />
+      case "profile":
+        return <ProfileSettingsPage onBack={() => setActiveTab("dashboard")} />
+      case "account":
+        return <AccountSettingsPage onBack={() => setActiveTab("dashboard")} />
+      case "billing":
+        return <BillingSettingsPage onBack={() => setActiveTab("dashboard")} />
+      default:
+        return <DashboardPage isPremium={false} />
     }
   }
 
   return (
-    <ErrorBoundary>
-      <div className="min-h-screen bg-background">
-        <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
-        <main className="container mx-auto px-4 py-4 md:px-6 md:py-8 max-w-7xl">
-          <div className="w-full">
-            <ErrorBoundary>{renderContent()}</ErrorBoundary>
-          </div>
-        </main>
-      </div>
-    </ErrorBoundary>
+    <div className="min-h-screen bg-background">
+      <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <main className="container mx-auto px-4 py-4 md:px-6 md:py-8 max-w-7xl">
+        <div className="w-full">{renderContent()}</div>
+      </main>
+    </div>
   )
 }
