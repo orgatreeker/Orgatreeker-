@@ -8,7 +8,6 @@ import { DateProvider } from "@/contexts/date-context"
 import { CurrencyProvider } from "@/contexts/currency-context"
 import { PerformanceProvider } from "@/components/performance-provider"
 import { OptimizedSmoothScroll } from "@/components/optimized-smooth-scroll"
-import { ErrorBoundary } from "@/components/error-boundary"
 
 export const metadata: Metadata = {
   title: "FinanceTracker - Personal Finance Management",
@@ -33,17 +32,15 @@ html {
         `}</style>
       </head>
       <body>
-        <ErrorBoundary>
-          <ThemeProvider>
-            <CurrencyProvider>
-              <DateProvider>
-                <PerformanceProvider>
-                  <OptimizedSmoothScroll>{children}</OptimizedSmoothScroll>
-                </PerformanceProvider>
-              </DateProvider>
-            </CurrencyProvider>
-          </ThemeProvider>
-        </ErrorBoundary>
+        <ThemeProvider>
+          <CurrencyProvider>
+            <DateProvider>
+              <PerformanceProvider>
+                <OptimizedSmoothScroll>{children}</OptimizedSmoothScroll>
+              </PerformanceProvider>
+            </DateProvider>
+          </CurrencyProvider>
+        </ThemeProvider>
       </body>
     </html>
   )
