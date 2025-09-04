@@ -14,7 +14,6 @@ import { User, Mail, CreditCard, Globe, Moon, Sun, Shield, HelpCircle } from "lu
 import { useTheme } from "@/contexts/theme-context"
 import { useCurrency, CURRENCIES } from "@/contexts/currency-context"
 import { BudgetSplitCustomization } from "@/components/budget-split-customization"
-import { CurrencyConverter } from "@/components/currency-converter"
 
 export function SettingsPage() {
   const { theme, setTheme } = useTheme()
@@ -147,8 +146,6 @@ export function SettingsPage() {
             </div>
           </CardContent>
         </Card>
-
-        <CurrencyConverter />
 
         {/* Account & Billing */}
         <div className="grid gap-6 md:grid-cols-2">
