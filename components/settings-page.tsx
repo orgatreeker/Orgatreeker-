@@ -6,10 +6,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { Mail, Globe, Moon, Sun, HelpCircle } from "lucide-react"
+import { Mail, Globe, Moon, Sun, HelpCircle, User, Settings, CreditCard, Camera, Shield, Trash2 } from "lucide-react"
 import { useTheme } from "@/contexts/theme-context"
 import { useCurrency, CURRENCIES } from "@/contexts/currency-context"
 import { BudgetSplitCustomization } from "@/components/budget-split-customization"
+import { LogoutButton } from "@/components/logout-button"
 
 export function SettingsPage() {
   const { theme, setTheme } = useTheme()
@@ -23,6 +24,149 @@ export function SettingsPage() {
       </div>
 
       <div className="grid gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Profile Settings
+            </CardTitle>
+            <CardDescription>Manage your profile picture, display name, and personal information</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base">Profile Picture</Label>
+                <p className="text-sm text-muted-foreground">Upload and manage your profile picture</p>
+              </div>
+              <Button variant="outline" className="bg-transparent">
+                <Camera className="mr-2 h-4 w-4" />
+                Change Picture
+              </Button>
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base">Display Name</Label>
+                <p className="text-sm text-muted-foreground">Update your name shown across the app</p>
+              </div>
+              <Button variant="outline" className="bg-transparent">
+                <Settings className="mr-2 h-4 w-4" />
+                Edit Name
+              </Button>
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base">Email Address</Label>
+                <p className="text-sm text-muted-foreground">View your account email (managed by Google)</p>
+              </div>
+              <Button variant="outline" disabled className="bg-muted">
+                <Mail className="mr-2 h-4 w-4" />
+                View Email
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" />
+              Account Settings
+            </CardTitle>
+            <CardDescription>Manage your account security, privacy, and account actions</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base">Account Security</Label>
+                <p className="text-sm text-muted-foreground">View account information and security settings</p>
+              </div>
+              <Button variant="outline" className="bg-transparent">
+                <Shield className="mr-2 h-4 w-4" />
+                Manage Security
+              </Button>
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base">Sign Out</Label>
+                <p className="text-sm text-muted-foreground">Sign out of your account securely</p>
+              </div>
+              <LogoutButton
+                variant="button"
+                className="bg-transparent border border-input hover:bg-accent hover:text-accent-foreground"
+              >
+                Sign Out
+              </LogoutButton>
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base text-destructive">Delete Account</Label>
+                <p className="text-sm text-muted-foreground">Permanently delete your account and all data</p>
+              </div>
+              <Button variant="outline" className="text-destructive hover:text-destructive bg-transparent">
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Account
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Billing Settings
+            </CardTitle>
+            <CardDescription>Manage your subscription, billing history, and payment methods</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base">Current Plan</Label>
+                <p className="text-sm text-muted-foreground">You are currently on the Free plan</p>
+              </div>
+              <Badge variant="secondary">Free Plan</Badge>
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base">Upgrade to Pro</Label>
+                <p className="text-sm text-muted-foreground">Unlock advanced features and unlimited budgets</p>
+              </div>
+              <Button variant="outline" className="bg-transparent">
+                <CreditCard className="mr-2 h-4 w-4" />
+                Upgrade Plan
+              </Button>
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base">Billing History</Label>
+                <p className="text-sm text-muted-foreground">View your payment history and invoices</p>
+              </div>
+              <Button variant="outline" disabled className="bg-muted">
+                <Mail className="mr-2 h-4 w-4" />
+                View History
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Preferences */}
         <Card>
           <CardHeader>
