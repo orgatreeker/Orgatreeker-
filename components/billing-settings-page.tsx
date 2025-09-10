@@ -18,6 +18,7 @@ export function BillingSettingsPage({ onBack }: BillingSettingsPageProps) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [isUpgrading, setIsUpgrading] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -57,6 +58,34 @@ export function BillingSettingsPage({ onBack }: BillingSettingsPageProps) {
       setMessage({ type: "error", text: "Failed to load billing information" })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleUpgrade = async (plan: "monthly" | "annual") => {
+    if (!user) return
+
+    setIsUpgrading(true)
+    setMessage(null)
+
+    try {
+      const checkoutUrl =
+        plan === "monthly"
+          ? "https://orgatreeker.lemonsqueezy.com/buy/0a307afb-5bfd-4b83-9219-1e144302c550"
+          : "https://orgatreeker.lemonsqueezy.com/buy/f03f4299-f0cb-473a-849b-577e6b5d78e2"
+
+      // Add user ID as custom data for webhook processing
+      const urlWithCustomData = `${checkoutUrl}?checkout[custom][user_id]=${user.id}`
+
+      // Redirect to Lemon Squeezy checkout
+      window.location.href = urlWithCustomData
+    } catch (error) {
+      console.error("Upgrade error:", error)
+      setMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Failed to start upgrade process",
+      })
+    } finally {
+      setIsUpgrading(false)
     }
   }
 
@@ -151,7 +180,7 @@ export function BillingSettingsPage({ onBack }: BillingSettingsPageProps) {
                   <Badge variant="default">Popular</Badge>
                 </div>
                 <div className="text-center">
-                  <p className="text-3xl font-bold">$9.99</p>
+                  <p className="text-3xl font-bold">$12</p>
                   <p className="text-sm text-muted-foreground">per month</p>
                 </div>
                 <ul className="text-sm space-y-1">
@@ -161,11 +190,15 @@ export function BillingSettingsPage({ onBack }: BillingSettingsPageProps) {
                   <li>• Export data</li>
                   <li>• Priority support</li>
                 </ul>
-                <Button
-                  className="w-full"
-                  onClick={() => setMessage({ type: "error", text: "Premium upgrade coming soon!" })}
-                >
-                  Upgrade to Premium
+                <Button className="w-full" onClick={() => handleUpgrade("monthly")} disabled={isUpgrading}>
+                  {isUpgrading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Upgrade to Premium"
+                  )}
                 </Button>
               </div>
 
@@ -176,8 +209,9 @@ export function BillingSettingsPage({ onBack }: BillingSettingsPageProps) {
                   <Badge variant="secondary">Best Value</Badge>
                 </div>
                 <div className="text-center">
-                  <p className="text-3xl font-bold">$19.99</p>
-                  <p className="text-sm text-muted-foreground">per month</p>
+                  <p className="text-3xl font-bold">$99</p>
+                  <p className="text-sm text-muted-foreground">per year</p>
+                  <p className="text-xs text-green-600">Save $45 vs monthly</p>
                 </div>
                 <ul className="text-sm space-y-1">
                   <li>• Everything in Premium</li>
@@ -189,9 +223,17 @@ export function BillingSettingsPage({ onBack }: BillingSettingsPageProps) {
                 <Button
                   variant="outline"
                   className="w-full bg-transparent"
-                  onClick={() => setMessage({ type: "error", text: "Pro upgrade coming soon!" })}
+                  onClick={() => handleUpgrade("annual")}
+                  disabled={isUpgrading}
                 >
-                  Upgrade to Pro
+                  {isUpgrading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Upgrade to Pro"
+                  )}
                 </Button>
               </div>
             </div>
