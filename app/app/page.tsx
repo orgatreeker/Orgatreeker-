@@ -17,7 +17,7 @@ export default function MainAppPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
-  const [isPremium, setIsPremium] = useState(false)
+  const [isPremium, setIsPremium] = useState(true)
   const router = useRouter()
   const supabase = createClient()
 
@@ -63,8 +63,8 @@ export default function MainAppPage() {
                 id: session.user.id,
                 email: session.user.email,
                 full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "",
-                subscription_status: "free",
-                subscription_plan: "free",
+                subscription_status: "active", // Set to active by default
+                subscription_plan: "pro", // Set to pro by default
                 onboarding_completed: false,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
@@ -84,25 +84,8 @@ export default function MainAppPage() {
           if (fetchedProfile) {
             setProfile(fetchedProfile)
 
-            const isUserPremium =
-              fetchedProfile.subscription_status === "active" &&
-              (fetchedProfile.subscription_plan === "monthly" || fetchedProfile.subscription_plan === "yearly")
-
-            console.log("[v0] Premium status check:", {
-              user_email: fetchedProfile.email,
-              subscription_status: fetchedProfile.subscription_status,
-              subscription_plan: fetchedProfile.subscription_plan,
-              isPremium: isUserPremium,
-              subscription_updated_at: fetchedProfile.subscription_updated_at,
-            })
-
-            setIsPremium(isUserPremium)
-
-            if (isUserPremium) {
-              console.log("[v0] ✅ User has PREMIUM access - all features unlocked!")
-            } else {
-              console.log("[v0] ⚠️ User has FREE access - some features locked")
-            }
+            console.log("[v0] ✅ User has FULL ACCESS - all features unlocked!")
+            setIsPremium(true)
           }
         } catch (profileError) {
           console.error("[v0] Profile error:", profileError)
@@ -111,13 +94,13 @@ export default function MainAppPage() {
             id: session.user.id,
             email: session.user.email,
             full_name: session.user.user_metadata?.full_name || "",
-            subscription_status: "free",
-            subscription_plan: "free",
+            subscription_status: "active", // Set to active by default
+            subscription_plan: "pro", // Set to pro by default
             onboarding_completed: false,
           }
           setProfile(fallbackProfile)
-          setIsPremium(false)
-          console.log("[v0] Using fallback profile with free access")
+          setIsPremium(true)
+          console.log("[v0] Using fallback profile with full access")
         }
       } catch (error) {
         console.error("[v0] Error checking auth:", error)
@@ -157,7 +140,7 @@ export default function MainAppPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground text-sm md:text-base">Loading your dashboard...</p>
-          <p className="text-xs text-muted-foreground mt-2">Checking subscription status...</p>
+          <p className="text-xs text-muted-foreground mt-2">All features unlocked!</p>
         </div>
       </div>
     )

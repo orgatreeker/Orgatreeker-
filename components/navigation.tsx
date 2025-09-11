@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
-import { User, CreditCard, Menu, Settings, Crown } from "lucide-react"
+import { User, Menu, Settings, Crown } from "lucide-react"
 import { LogoutButton } from "@/components/logout-button"
 import { getProfile, createProfile, type Profile } from "@/lib/profile-utils"
 
@@ -25,7 +25,7 @@ interface NavigationProps {
   profile?: any
 }
 
-export function Navigation({ activeTab, onTabChange, isPremium = false, profile: passedProfile }: NavigationProps) {
+export function Navigation({ activeTab, onTabChange, isPremium = true, profile: passedProfile }: NavigationProps) {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -145,15 +145,13 @@ export function Navigation({ activeTab, onTabChange, isPremium = false, profile:
           </div>
           <span className="font-semibold text-base md:text-lg hidden sm:block">FinanceTracker</span>
           <span className="font-semibold text-base md:text-lg sm:hidden">FT</span>
-          {isPremium && (
-            <Badge
-              variant="secondary"
-              className="hidden sm:flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white"
-            >
-              <Crown className="h-3 w-3" />
-              Pro
-            </Badge>
-          )}
+          <Badge
+            variant="secondary"
+            className="hidden sm:flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+          >
+            <Crown className="h-3 w-3" />
+            Pro
+          </Badge>
         </div>
 
         {/* Desktop Navigation Tabs - Hidden on mobile */}
@@ -185,15 +183,13 @@ export function Navigation({ activeTab, onTabChange, isPremium = false, profile:
                     <span className="text-primary-foreground font-bold text-sm">FT</span>
                   </div>
                   <span className="font-semibold text-lg">FinanceTracker</span>
-                  {isPremium && (
-                    <Badge
-                      variant="secondary"
-                      className="flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white"
-                    >
-                      <Crown className="h-3 w-3" />
-                      Pro
-                    </Badge>
-                  )}
+                  <Badge
+                    variant="secondary"
+                    className="flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+                  >
+                    <Crown className="h-3 w-3" />
+                    Pro
+                  </Badge>
                 </div>
 
                 {/* Mobile Navigation Items */}
@@ -231,10 +227,6 @@ export function Navigation({ activeTab, onTabChange, isPremium = false, profile:
                       <Settings className="mr-2 h-4 w-4" />
                       Account Settings
                     </Button>
-                    <Button variant="ghost" className="w-full justify-start" onClick={handleBillingNavigation}>
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Billing Settings
-                    </Button>
                     <LogoutButton className="w-full justify-start text-destructive" />
                   </div>
                 )}
@@ -258,11 +250,9 @@ export function Navigation({ activeTab, onTabChange, isPremium = false, profile:
                     {getUserInitials()}
                   </AvatarFallback>
                 </Avatar>
-                {isPremium && (
-                  <div className="absolute -top-1 -right-1 h-4 w-4 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full flex items-center justify-center">
-                    <Crown className="h-2.5 w-2.5 text-white" />
-                  </div>
-                )}
+                <div className="absolute -top-1 -right-1 h-4 w-4 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full flex items-center justify-center">
+                  <Crown className="h-2.5 w-2.5 text-white" />
+                </div>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -277,15 +267,13 @@ export function Navigation({ activeTab, onTabChange, isPremium = false, profile:
                   <div className="flex flex-col space-y-1 p-3 bg-muted/50 rounded-md mx-1 mb-1">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium leading-none text-foreground">{getUserDisplayName()}</p>
-                      {isPremium && (
-                        <Badge
-                          variant="secondary"
-                          className="text-xs bg-gradient-to-r from-amber-500 to-orange-500 text-white"
-                        >
-                          <Crown className="h-3 w-3 mr-1" />
-                          Pro
-                        </Badge>
-                      )}
+                      <Badge
+                        variant="secondary"
+                        className="text-xs bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+                      >
+                        <Crown className="h-3 w-3 mr-1" />
+                        Pro
+                      </Badge>
                     </div>
                     <p className="text-xs leading-none text-muted-foreground truncate">{user.email}</p>
                   </div>
@@ -311,16 +299,6 @@ export function Navigation({ activeTab, onTabChange, isPremium = false, profile:
               >
                 <Settings className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">Account Settings</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  console.log("[v0] Billing Settings clicked")
-                  handleBillingNavigation()
-                }}
-                className="cursor-pointer hover:bg-accent focus:bg-accent rounded-md mx-1 my-0.5 flex items-center gap-2 p-2"
-              >
-                <CreditCard className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Billing Settings</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="my-1" />
               <div className="mx-1 my-0.5">

@@ -6,20 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import {
-  Mail,
-  Globe,
-  Moon,
-  Sun,
-  HelpCircle,
-  User,
-  Settings,
-  CreditCard,
-  Camera,
-  Shield,
-  Trash2,
-  Crown,
-} from "lucide-react"
+import { Mail, Globe, Moon, Sun, HelpCircle, User, Settings, Camera, Shield, Trash2, Crown } from "lucide-react"
 import { useTheme } from "@/contexts/theme-context"
 import { useCurrency, CURRENCIES } from "@/contexts/currency-context"
 import { BudgetSplitCustomization } from "@/components/budget-split-customization"
@@ -31,27 +18,13 @@ interface SettingsPageProps {
   isPremium?: boolean
 }
 
-export function SettingsPage({ profile, isPremium = false }: SettingsPageProps) {
+export function SettingsPage({ profile, isPremium = true }: SettingsPageProps) {
   const { theme, setTheme } = useTheme()
   const { selectedCurrency, setCurrency } = useCurrency()
   const router = useRouter()
 
-  const handleUpgrade = () => {
-    router.push("/pricing")
-  }
-
   const getPlanInfo = () => {
-    if (!profile) return { name: "Free Plan", badge: "Free Plan", variant: "secondary" as const }
-
-    if (profile.subscription_status === "active") {
-      if (profile.subscription_plan === "monthly") {
-        return { name: "Pro Monthly", badge: "Pro Monthly", variant: "default" as const }
-      } else if (profile.subscription_plan === "yearly") {
-        return { name: "Pro Yearly", badge: "Pro Yearly", variant: "default" as const }
-      }
-    }
-
-    return { name: "Free Plan", badge: "Free Plan", variant: "secondary" as const }
+    return { name: "Pro Plan", badge: "Pro Plan", variant: "default" as const }
   }
 
   const planInfo = getPlanInfo()
@@ -62,12 +35,10 @@ export function SettingsPage({ profile, isPremium = false }: SettingsPageProps) 
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
         <div className="flex items-center gap-3">
           <Badge variant="secondary">App Settings</Badge>
-          {isPremium && (
-            <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
-              <Crown className="w-3 h-3 mr-1" />
-              Pro
-            </Badge>
-          )}
+          <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
+            <Crown className="w-3 h-3 mr-1" />
+            Pro
+          </Badge>
         </div>
       </div>
 
@@ -167,77 +138,6 @@ export function SettingsPage({ profile, isPremium = false }: SettingsPageProps) 
               <Button variant="outline" className="text-destructive hover:text-destructive bg-transparent">
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete Account
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Billing Settings
-            </CardTitle>
-            <CardDescription>Manage your subscription, billing history, and payment methods</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base">Current Plan</Label>
-                <p className="text-sm text-muted-foreground">
-                  {isPremium ? `You are currently on the ${planInfo.name}` : "You are currently on the Free plan"}
-                </p>
-                {isPremium && profile?.subscription_current_period_end && (
-                  <p className="text-xs text-muted-foreground">
-                    Next billing: {new Date(profile.subscription_current_period_end).toLocaleDateString()}
-                  </p>
-                )}
-              </div>
-              <Badge
-                variant={planInfo.variant}
-                className={isPremium ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-white" : ""}
-              >
-                {isPremium && <Crown className="w-3 h-3 mr-1" />}
-                {planInfo.badge}
-              </Badge>
-            </div>
-
-            <Separator />
-
-            {!isPremium ? (
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-base">Upgrade to Pro</Label>
-                  <p className="text-sm text-muted-foreground">Unlock advanced features and unlimited budgets</p>
-                </div>
-                <Button variant="outline" className="bg-transparent" onClick={handleUpgrade}>
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Upgrade Plan
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-base">Manage Subscription</Label>
-                  <p className="text-sm text-muted-foreground">Update payment method or cancel subscription</p>
-                </div>
-                <Button variant="outline" className="bg-transparent">
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Manage Billing
-                </Button>
-              </div>
-            )}
-
-            <Separator />
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base">Billing History</Label>
-                <p className="text-sm text-muted-foreground">View your payment history and invoices</p>
-              </div>
-              <Button variant="outline" disabled={!isPremium} className={!isPremium ? "bg-muted" : "bg-transparent"}>
-                <Mail className="mr-2 h-4 w-4" />
-                View History
               </Button>
             </div>
           </CardContent>
