@@ -30,6 +30,7 @@ export function PricingPage({ user }: PricingPageProps) {
       params.set("checkout[custom][user_email]", user.email)
       params.set("checkout[email]", user.email)
       params.set("checkout[name]", user.user_metadata?.full_name || user.email.split("@")[0])
+      params.set("checkout[custom][redirect_url]", "https://app.orgatreeker.com/app")
 
       checkoutUrl = `${baseUrl}?${params.toString()}`
     }
@@ -106,7 +107,7 @@ export function PricingPage({ user }: PricingPageProps) {
               className="px-6 relative"
             >
               Annual
-              <Badge className="absolute -top-2 -right-2 bg-green-500 text-white text-xs">Save $45</Badge>
+              <Badge className="absolute -top-2 -right-2 bg-green-500 text-white text-xs">Save $31</Badge>
             </Button>
           </div>
         </div>
@@ -174,13 +175,13 @@ export function PricingPage({ user }: PricingPageProps) {
               <CardDescription>
                 {billingCycle === "monthly"
                   ? "Billed monthly or save with annual plan"
-                  : "Billed annually - save $45 per year"}
+                  : "Billed annually - save $31 per year"}
               </CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold">${billingCycle === "monthly" ? "12" : "99"}</span>
+                <span className="text-4xl font-bold">${billingCycle === "monthly" ? "5" : "29"}</span>
                 <span className="text-muted-foreground">/{billingCycle === "monthly" ? "month" : "year"}</span>
                 {billingCycle === "annual" && (
-                  <div className="text-sm text-muted-foreground mt-1">$8.25/month when billed annually</div>
+                  <div className="text-sm text-muted-foreground mt-1">$2.42/month when billed annually</div>
                 )}
               </div>
             </CardHeader>
