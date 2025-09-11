@@ -24,10 +24,14 @@ export default function MainAppPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Auth timeout")), 10000))
+
+        const authPromise = supabase.auth.getSession()
+
         const {
           data: { session },
           error,
-        } = await supabase.auth.getSession()
+        } = (await Promise.race([authPromise, timeoutPromise])) as any
 
         if (error) {
           console.error("Auth error:", error)
@@ -40,53 +44,47 @@ export default function MainAppPage() {
           return
         }
 
-        const { data: fetchedProfile, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .single()
-
-        if (profileError && profileError.code === "PGRST116") {
-          const { data: newProfile, error: insertError } = await supabase
-            .from("profiles")
-            .insert({
-              id: session.user.id,
-              email: session.user.email,
-              full_name:
-                session.user.user_metadata?.full_name ||
-                session.user.user_metadata?.name ||
-                `${session.user.user_metadata?.first_name || ""} ${session.user.user_metadata?.last_name || ""}`.trim() ||
-                "",
-              subscription_status: "free",
-              subscription_plan: "free",
-            })
-            .select()
-            .single()
-
-          if (insertError) {
-            console.error("Error creating profile:", insertError)
-          } else {
-            setProfile(newProfile)
-            setIsPremium(false)
-          }
-        } else if (fetchedProfile) {
-          setProfile(fetchedProfile)
-          const isUserPremium =
-            fetchedProfile.subscription_status === "active" &&
-            (fetchedProfile.subscription_plan === "monthly" || fetchedProfile.subscription_plan === "annual")
-
-          console.log("[v0] Premium status check:", {
-            subscription_status: fetchedProfile.subscription_status,
-            subscription_plan: fetchedProfile.subscription_plan,
-            isPremium: isUserPremium,
-            user_email: fetchedProfile.email,
-          })
-
-          setIsPremium(isUserPremium)
-        }
-
         setUser(session.user)
         setIsAuthenticated(true)
+
+        try {
+          const { data: fetchedProfile, error: profileError } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", session.user.id)
+            .single()
+
+          if (profileError && profileError.code === "PGRST116") {
+            const { data: newProfile } = await supabase
+              .from("profiles")
+              .insert({
+                id: session.user.id,
+                email: session.user.email,
+                full_name: session.user.user_metadata?.full_name || "",
+                subscription_status: "free",
+                subscription_plan: "free",
+              })
+              .select()
+              .single()
+
+            if (newProfile) {
+              setProfile(newProfile)
+              setIsPremium(false)
+            }
+          } else if (fetchedProfile) {
+            setProfile(fetchedProfile)
+            const isUserPremium = fetchedProfile.subscription_status === "active"
+            setIsPremium(isUserPremium)
+          }
+        } catch (profileError) {
+          console.error("Profile error:", profileError)
+          setProfile({
+            id: session.user.id,
+            email: session.user.email,
+            subscription_status: "free",
+          })
+          setIsPremium(false)
+        }
       } catch (error) {
         console.error("Error checking auth:", error)
         router.push("/")
@@ -106,9 +104,6 @@ export default function MainAppPage() {
         setProfile(null)
         setIsPremium(false)
         router.push("/")
-      } else if (event === "SIGNED_IN" && session) {
-        setUser(session.user)
-        setIsAuthenticated(true)
       }
     })
 
