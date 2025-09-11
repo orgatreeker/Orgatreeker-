@@ -24,8 +24,6 @@ import { useRouter } from "next/navigation"
 import { useDateContext } from "@/contexts/date-context"
 import { useCurrency } from "@/contexts/currency-context"
 import { useBudgetSplit } from "@/hooks/use-budget-split"
-import { UpgradePrompt } from "@/components/upgrade-prompt"
-import { checkPremiumStatus } from "@/lib/premium-utils"
 
 interface IncomeSource {
   id: string
@@ -76,7 +74,6 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
     income: 0,
     expenses: 0,
   })
-  const [userPremiumStatus, setUserPremiumStatus] = useState(false)
   const router = useRouter()
   const { selectedDate, selectedYear, selectedMonthNumber } = useDateContext()
   const { formatAmount } = useCurrency()
@@ -96,7 +93,6 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
         fetchTransactions(user.id),
         fetchHistoricalData(user.id),
         fetchPreviousMonthData(user.id),
-        checkUserPremiumStatus(user.id),
       ])
     }
   }, [selectedYear, selectedMonthNumber, user])
@@ -121,7 +117,6 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
         fetchTransactions(user.id),
         fetchHistoricalData(user.id),
         fetchPreviousMonthData(user.id),
-        checkUserPremiumStatus(user.id),
       ])
     } catch (error) {
       console.error("Error checking user:", error)
@@ -272,15 +267,6 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
     }
   }
 
-  const checkUserPremiumStatus = async (userId: string) => {
-    try {
-      const isPremium = await checkPremiumStatus(userId)
-      setUserPremiumStatus(isPremium)
-    } catch (error) {
-      console.error("Error checking premium status:", error)
-    }
-  }
-
   const totalIncome = incomeSources.reduce((sum, source) => sum + source.amount, 0)
   const totalBudgeted = budgetCategories.reduce((sum, category) => sum + category.budgeted_amount, 0)
   const totalSpent = transactions.reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0)
@@ -357,21 +343,13 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
     <div className="space-y-6">
       {error && <div className="bg-destructive/15 text-destructive px-4 py-2 rounded-md">{error}</div>}
 
-      {!userPremiumStatus && (
-        <UpgradePrompt
-          feature="Unlock Advanced Analytics"
-          description="Get detailed insights, growth tracking, and expense breakdowns to take full control of your finances."
-          compact
-        />
-      )}
-
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
         <div className="flex items-center gap-3">
           <Badge variant="secondary" className="text-sm">
             {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
           </Badge>
-          {userPremiumStatus && (
+          {isPremium && (
             <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
               <Crown className="w-3 h-3 mr-1" />
               Pro
@@ -423,7 +401,7 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Growth</CardTitle>
-            {!userPremiumStatus ? (
+            {!isPremium ? (
               <Lock className="h-4 w-4 text-muted-foreground" />
             ) : growthPercentage > 0 ? (
               <TrendingUp className="h-4 w-4 text-green-600" />
@@ -432,14 +410,12 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
             )}
           </CardHeader>
           <CardContent>
-            {!userPremiumStatus ? (
+            {!isPremium ? (
               <div className="space-y-2">
                 <div className="text-2xl font-bold text-muted-foreground">--</div>
-                <Button size="sm" variant="outline" className="text-xs h-6 bg-transparent" asChild>
-                  <a href="/pricing">
-                    <Crown className="w-3 h-3 mr-1" />
-                    Upgrade to Pro
-                  </a>
+                <Button size="sm" variant="outline" className="text-xs h-6 bg-transparent">
+                  <Crown className="w-3 h-3 mr-1" />
+                  Upgrade to Pro
                 </Button>
               </div>
             ) : (
@@ -507,7 +483,7 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
                 Breakdown by category for {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
               </CardDescription>
             </div>
-            {!userPremiumStatus && (
+            {!isPremium && (
               <Badge variant="outline" className="text-xs">
                 <Lock className="w-3 h-3 mr-1" />
                 Pro Only
@@ -515,7 +491,7 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
             )}
           </CardHeader>
           <CardContent>
-            {!userPremiumStatus ? (
+            {!isPremium ? (
               <div className="flex flex-col items-center justify-center h-[300px] space-y-4">
                 <div className="relative">
                   <div className="w-32 h-32 rounded-full bg-muted/50 flex items-center justify-center">
@@ -525,11 +501,9 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
                 <div className="text-center space-y-2">
                   <p className="text-sm font-medium">Advanced Analytics Locked</p>
                   <p className="text-xs text-muted-foreground">Upgrade to Pro to see detailed expense breakdowns</p>
-                  <Button size="sm" className="mt-2" asChild>
-                    <a href="/pricing">
-                      <Crown className="w-3 h-3 mr-1" />
-                      Upgrade to Pro
-                    </a>
+                  <Button size="sm" className="mt-2">
+                    <Crown className="w-3 h-3 mr-1" />
+                    Upgrade to Pro
                   </Button>
                 </div>
               </div>
