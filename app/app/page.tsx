@@ -17,7 +17,7 @@ export default function MainAppPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
-  const [isPremium, setIsPremium] = useState(true) // Always true - all features unlocked
+  const [isPremium, setIsPremium] = useState(false) // Default to false, check from database
   const router = useRouter()
   const supabase = createClient()
 
@@ -31,12 +31,12 @@ export default function MainAppPage() {
 
         if (error) {
           console.error("Auth error:", error)
-          router.push("/auth/login")
+          router.push("/pricing") // Redirect to pricing instead of login
           return
         }
 
         if (!session) {
-          router.push("/auth/login")
+          router.push("/pricing") // Redirect to pricing instead of login
           return
         }
 
@@ -57,8 +57,8 @@ export default function MainAppPage() {
                 id: session.user.id,
                 email: session.user.email,
                 full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "",
-                subscription_status: "active",
-                subscription_plan: "pro",
+                subscription_status: "free", // Default to free instead of active
+                subscription_plan: "free", // Default to free instead of pro
                 onboarding_completed: false,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
@@ -76,7 +76,16 @@ export default function MainAppPage() {
 
           if (fetchedProfile) {
             setProfile(fetchedProfile)
-            setIsPremium(true) // Always set to true for all users
+            const isActiveSubscription =
+              fetchedProfile.subscription_status === "active" &&
+              (fetchedProfile.subscription_plan === "monthly" || fetchedProfile.subscription_plan === "yearly")
+            setIsPremium(isActiveSubscription)
+
+            console.log("[v0] Subscription status:", {
+              status: fetchedProfile.subscription_status,
+              plan: fetchedProfile.subscription_plan,
+              isPremium: isActiveSubscription,
+            })
           }
         } catch (profileError) {
           console.error("Profile error:", profileError)
@@ -84,22 +93,43 @@ export default function MainAppPage() {
             id: session.user.id,
             email: session.user.email,
             full_name: session.user.user_metadata?.full_name || "",
-            subscription_status: "active",
-            subscription_plan: "pro",
+            subscription_status: "free",
+            subscription_plan: "free",
             onboarding_completed: false,
           }
           setProfile(fallbackProfile)
-          setIsPremium(true)
+          setIsPremium(false) // Set to false for fallback
         }
       } catch (error) {
         console.error("Error checking auth:", error)
-        router.push("/auth/login")
+        router.push("/pricing") // Redirect to pricing instead of login
       } finally {
         setIsLoading(false)
       }
     }
 
     checkAuth()
+
+    const subscriptionChannel = supabase
+      .channel("subscription-updates")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${user?.id}`,
+        },
+        (payload) => {
+          console.log("[v0] Subscription updated:", payload.new)
+          setProfile(payload.new)
+          const isActiveSubscription =
+            payload.new.subscription_status === "active" &&
+            (payload.new.subscription_plan === "monthly" || payload.new.subscription_plan === "yearly")
+          setIsPremium(isActiveSubscription)
+        },
+      )
+      .subscribe()
 
     const {
       data: { subscription },
@@ -109,29 +139,17 @@ export default function MainAppPage() {
         setUser(null)
         setProfile(null)
         setIsPremium(false)
-        router.push("/")
+        router.push("/pricing") // Redirect to pricing instead of home
       } else if (event === "SIGNED_IN" && session) {
         window.location.reload()
       }
     })
 
-    return () => subscription.unsubscribe()
-  }, [router, supabase.auth])
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground text-sm md:text-base">Loading your dashboard...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return null // Will redirect to login
-  }
+    return () => {
+      subscription.unsubscribe()
+      subscriptionChannel.unsubscribe() // Cleanup subscription channel
+    }
+  }, [router, supabase.auth, user?.id])
 
   const renderContent = () => {
     switch (activeTab) {
@@ -152,6 +170,21 @@ export default function MainAppPage() {
       default:
         return <DashboardPage isPremium={isPremium} />
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground text-sm md:text-base">Loading your dashboard...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null // Will redirect to pricing
   }
 
   return (
