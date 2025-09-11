@@ -3,7 +3,7 @@ import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Loader2, XCircle } from "lucide-react"
+import { CheckCircle, Loader2, XCircle, Crown } from "lucide-react"
 
 export default function PaymentSuccessPage() {
   const router = useRouter()
@@ -36,6 +36,8 @@ export default function PaymentSuccessPage() {
         if (result.success && result.status === "COMPLETED") {
           setStatus("success")
           setMessage("Payment completed successfully! Your subscription is now active.")
+          localStorage.setItem("payment_success", "true")
+          console.log("[v0] Payment success - setting localStorage flag")
         } else {
           setStatus("failed")
           setMessage("Payment verification failed. Please contact support.")
@@ -49,6 +51,13 @@ export default function PaymentSuccessPage() {
 
     verifyPayment()
   }, [searchParams])
+
+  const handleGoToDashboard = () => {
+    if (status === "success") {
+      localStorage.setItem("payment_success", "true")
+    }
+    router.push("/app")
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -64,10 +73,20 @@ export default function PaymentSuccessPage() {
         <CardContent className="text-center space-y-4">
           <p className="text-muted-foreground">{message}</p>
 
+          {status === "success" && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-2">
+              <div className="flex items-center justify-center gap-2 text-green-700 font-medium">
+                <Crown className="h-4 w-4" />
+                Welcome to Pro!
+              </div>
+              <p className="text-sm text-green-600">All premium features are now unlocked in your dashboard.</p>
+            </div>
+          )}
+
           {status !== "loading" && (
             <div className="space-y-2">
-              <Button onClick={() => router.push("/app")} className="w-full">
-                Go to Dashboard
+              <Button onClick={handleGoToDashboard} className="w-full">
+                {status === "success" ? "View Pro Dashboard" : "Go to Dashboard"}
               </Button>
               {status === "failed" && (
                 <Button variant="outline" onClick={() => router.push("/app")} className="w-full">

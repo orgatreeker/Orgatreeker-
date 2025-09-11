@@ -75,6 +75,10 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
 
   const supabase = createClient()
 
+  const handleUpgradeClick = () => {
+    router.push("/settings?tab=billing")
+  }
+
   useEffect(() => {
     checkUser()
   }, [])
@@ -375,7 +379,7 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
                   <p className="text-sm text-orange-700">You've reached the 5 income source limit for free users.</p>
                 </div>
               </div>
-              <Button size="sm" className="bg-orange-600 hover:bg-orange-700">
+              <Button size="sm" className="bg-orange-600 hover:bg-orange-700" onClick={handleUpgradeClick}>
                 <Crown className="w-3 h-3 mr-1" />
                 Upgrade to Pro
               </Button>

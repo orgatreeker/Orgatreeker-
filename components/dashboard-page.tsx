@@ -331,6 +331,10 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
     }
   })
 
+  const handleUpgradeClick = () => {
+    router.push("/settings?tab=billing")
+  }
+
   if (isLoading || budgetSplitLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -413,7 +417,7 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
             {!isPremium ? (
               <div className="space-y-2">
                 <div className="text-2xl font-bold text-muted-foreground">--</div>
-                <Button size="sm" variant="outline" className="text-xs h-6 bg-transparent">
+                <Button size="sm" variant="outline" className="text-xs h-6 bg-transparent" onClick={handleUpgradeClick}>
                   <Crown className="w-3 h-3 mr-1" />
                   Upgrade to Pro
                 </Button>
@@ -501,7 +505,7 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
                 <div className="text-center space-y-2">
                   <p className="text-sm font-medium">Advanced Analytics Locked</p>
                   <p className="text-xs text-muted-foreground">Upgrade to Pro to see detailed expense breakdowns</p>
-                  <Button size="sm" className="mt-2">
+                  <Button size="sm" className="mt-2" onClick={handleUpgradeClick}>
                     <Crown className="w-3 h-3 mr-1" />
                     Upgrade to Pro
                   </Button>

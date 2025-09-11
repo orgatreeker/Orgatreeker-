@@ -16,6 +16,7 @@ export default function MainAppPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [user, setUser] = useState<any>(null)
+  const [isPremium, setIsPremium] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -58,6 +59,15 @@ export default function MainAppPage() {
           if (insertError) {
             console.error("Error creating profile:", insertError)
           }
+          setIsPremium(false)
+        } else if (profile) {
+          const isSubscribed =
+            profile.subscription_status === "active" &&
+            profile.subscription_expires_at &&
+            new Date(profile.subscription_expires_at) > new Date()
+
+          setIsPremium(isSubscribed)
+          console.log("[v0] Premium status:", isSubscribed, "Expires:", profile.subscription_expires_at)
         }
 
         setUser(session.user)
@@ -78,15 +88,70 @@ export default function MainAppPage() {
       if (event === "SIGNED_OUT" || !session) {
         setIsAuthenticated(false)
         setUser(null)
+        setIsPremium(false)
         router.push("/")
       } else if (event === "SIGNED_IN" && session) {
         setUser(session.user)
         setIsAuthenticated(true)
+        // Re-check premium status on sign in
+        checkAuth()
       }
     })
 
     return () => subscription.unsubscribe()
   }, [router, supabase.auth])
+
+  const refreshPremiumStatus = async () => {
+    if (!user) return
+
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("subscription_status, subscription_expires_at")
+        .eq("id", user.id)
+        .single()
+
+      if (profile) {
+        const isSubscribed =
+          profile.subscription_status === "active" &&
+          profile.subscription_expires_at &&
+          new Date(profile.subscription_expires_at) > new Date()
+
+        setIsPremium(isSubscribed)
+        console.log("[v0] Refreshed premium status:", isSubscribed)
+      }
+    } catch (error) {
+      console.error("Error refreshing premium status:", error)
+    }
+  }
+
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "payment_success") {
+        console.log("[v0] Payment success detected, refreshing premium status")
+        refreshPremiumStatus()
+        localStorage.removeItem("payment_success")
+      }
+    }
+
+    window.addEventListener("storage", handleStorageChange)
+
+    // Also check on focus (when user returns to tab)
+    const handleFocus = () => {
+      if (localStorage.getItem("payment_success")) {
+        console.log("[v0] Payment success on focus, refreshing premium status")
+        refreshPremiumStatus()
+        localStorage.removeItem("payment_success")
+      }
+    }
+
+    window.addEventListener("focus", handleFocus)
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange)
+      window.removeEventListener("focus", handleFocus)
+    }
+  }, [user])
 
   if (isLoading) {
     return (
@@ -106,11 +171,11 @@ export default function MainAppPage() {
   const renderContent = () => {
     switch (activeTab) {
       case "dashboard":
-        return <DashboardPage isPremium={false} />
+        return <DashboardPage isPremium={isPremium} />
       case "income":
-        return <IncomePage isPremium={false} />
+        return <IncomePage isPremium={isPremium} />
       case "budget":
-        return <BudgetPage isPremium={false} />
+        return <BudgetPage isPremium={isPremium} />
       case "settings":
         return <SettingsPage />
       case "profile":
@@ -120,7 +185,7 @@ export default function MainAppPage() {
       case "billing":
         return <ProfileSettingsPage onBack={() => setActiveTab("dashboard")} />
       default:
-        return <DashboardPage isPremium={false} />
+        return <DashboardPage isPremium={isPremium} />
     }
   }
 
