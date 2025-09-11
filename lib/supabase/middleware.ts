@@ -41,6 +41,7 @@ export async function updateSession(request: NextRequest) {
     !user &&
     !request.nextUrl.pathname.startsWith("/auth") &&
     !request.nextUrl.pathname.startsWith("/api") &&
+    !request.nextUrl.pathname.startsWith("/app") && // Allow /app route
     request.nextUrl.pathname !== "/"
   ) {
     // no user, redirect to login page

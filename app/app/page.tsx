@@ -24,8 +24,6 @@ export default function MainAppPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        console.log("[v0] Checking authentication...")
-
         const {
           data: { session },
           error,
@@ -33,13 +31,13 @@ export default function MainAppPage() {
 
         if (error) {
           console.error("[v0] Auth error:", error)
-          router.push("/auth/login")
+          router.replace("/auth/login")
           return
         }
 
         if (!session) {
           console.log("[v0] No session found, redirecting to login")
-          router.push("/auth/login")
+          router.replace("/auth/login")
           return
         }
 
@@ -108,9 +106,9 @@ export default function MainAppPage() {
           console.error("[v0] Profile error:", profileError)
 
           const fallbackProfile = {
-            id: session.user.id,
-            email: session.user.email,
-            full_name: session.user.user_metadata?.full_name || "",
+            id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || "",
             subscription_status: "free",
             subscription_plan: "free",
             onboarding_completed: false,
@@ -121,7 +119,7 @@ export default function MainAppPage() {
         }
       } catch (error) {
         console.error("[v0] Error checking auth:", error)
-        router.push("/auth/login")
+        router.replace("/auth/login")
       } finally {
         setIsLoading(false)
       }
@@ -140,11 +138,12 @@ export default function MainAppPage() {
         setUser(null)
         setProfile(null)
         setIsPremium(false)
-        router.push("/")
+        router.replace("/")
       } else if (event === "SIGNED_IN" && session) {
-        console.log("[v0] User signed in, refreshing profile")
-        // Refresh the page to reload profile data
-        window.location.reload()
+        console.log("[v0] User signed in, setting authenticated state")
+        setUser(session.user)
+        setIsAuthenticated(true)
+        // Don't reload the page, just update state
       }
     })
 
