@@ -127,6 +127,34 @@ export default function MainAppPage() {
 
     checkAuth()
 
+    const channel = supabase
+      .channel("profile-subscription-updates")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles",
+        },
+        (payload) => {
+          console.log("[v0] Profile subscription updated:", payload.new)
+          if (payload.new && user && payload.new.id === user.id) {
+            setProfile(payload.new)
+            const isUserPremium =
+              payload.new.subscription_status === "active" &&
+              (payload.new.subscription_plan === "monthly" || payload.new.subscription_plan === "yearly")
+            setIsPremium(isUserPremium)
+
+            if (isUserPremium) {
+              console.log("[v0] 🎉 SUBSCRIPTION ACTIVATED! Premium features unlocked!")
+            } else {
+              console.log("[v0] ⚠️ Subscription status changed to free")
+            }
+          }
+        },
+      )
+      .subscribe()
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -147,8 +175,11 @@ export default function MainAppPage() {
       }
     })
 
-    return () => subscription.unsubscribe()
-  }, [router, supabase.auth])
+    return () => {
+      subscription.unsubscribe()
+      supabase.removeChannel(channel)
+    }
+  }, [router, supabase.auth]) // Removed user?.id from the dependency array
 
   if (isLoading) {
     return (
