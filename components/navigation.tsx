@@ -13,9 +13,11 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { User, CreditCard, Menu, Settings } from "lucide-react"
+import { User, CreditCard, Menu, Settings, Crown } from "lucide-react"
 import { LogoutButton } from "@/components/logout-button"
 import { getProfile, createProfile, type Profile } from "@/lib/profile-utils"
+import { checkPremiumStatus } from "@/lib/premium-utils"
+import Link from "next/link"
 
 interface NavigationProps {
   activeTab: string
@@ -26,6 +28,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isPremium, setIsPremium] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -56,6 +59,9 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
           }
 
           setProfile(profileData)
+
+          const premiumStatus = await checkPremiumStatus(user.id)
+          setIsPremium(premiumStatus)
         }
       } catch (error) {
         console.error("Error in getUser:", error)
@@ -85,6 +91,10 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
         }
 
         setProfile(profileData)
+
+        // Check premium status on sign in
+        const premiumStatus = await checkPremiumStatus(session.user.id)
+        setIsPremium(premiumStatus)
       }
     })
 
@@ -155,73 +165,20 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
           </Tabs>
         </div>
 
-        {/* Mobile Menu Button - Visible on mobile only */}
-        <div className="md:hidden">
-          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <Menu className="h-4 w-4" />
-                <span className="sr-only">Toggle menu</span>
+        <div className="hidden md:flex items-center space-x-3">
+          {!isPremium && (
+            <Link href="/pricing">
+              <Button
+                size="sm"
+                className="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white"
+              >
+                <Crown className="w-3 h-3 mr-1" />
+                Upgrade
               </Button>
-            </SheetTrigger>
-            <SheetContent side="right" className="w-64">
-              <div className="flex flex-col space-y-4 mt-6">
-                <div className="flex items-center space-x-2 pb-4 border-b">
-                  <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-                    <span className="text-primary-foreground font-bold text-sm">FT</span>
-                  </div>
-                  <span className="font-semibold text-lg">FinanceTracker</span>
-                </div>
+            </Link>
+          )}
 
-                {/* Mobile Navigation Items */}
-                <div className="space-y-2">
-                  {navigationItems.map((item) => (
-                    <Button
-                      key={item.value}
-                      variant={activeTab === item.value ? "default" : "ghost"}
-                      className="w-full justify-start"
-                      onClick={() => handleTabChange(item.value)}
-                    >
-                      {item.label}
-                    </Button>
-                  ))}
-                </div>
-
-                {/* Mobile User Info */}
-                {user && (
-                  <div className="pt-4 border-t space-y-2">
-                    <div className="flex items-center space-x-2 p-2">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src="/placeholder.svg?height=32&width=32" alt="Profile" />
-                        <AvatarFallback className="text-xs">{getUserInitials()}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col">
-                        <p className="text-sm font-medium leading-none">{getUserDisplayName()}</p>
-                        <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" className="w-full justify-start" onClick={handleProfileNavigation}>
-                      <User className="mr-2 h-4 w-4" />
-                      Profile Settings
-                    </Button>
-                    <Button variant="ghost" className="w-full justify-start" onClick={handleAccountNavigation}>
-                      <Settings className="mr-2 h-4 w-4" />
-                      Account Settings
-                    </Button>
-                    <Button variant="ghost" className="w-full justify-start" onClick={handleBillingNavigation}>
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Billing Settings
-                    </Button>
-                    <LogoutButton className="w-full justify-start text-destructive" />
-                  </div>
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
-
-        {/* Desktop Profile Dropdown - Hidden on mobile */}
-        <div className="hidden md:block">
+          {/* Desktop Profile Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -292,6 +249,80 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
+        </div>
+
+        {/* Mobile Menu Button - Visible on mobile only */}
+        <div className="md:hidden">
+          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <Menu className="h-4 w-4" />
+                <span className="sr-only">Toggle menu</span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-64">
+              <div className="flex flex-col space-y-4 mt-6">
+                <div className="flex items-center space-x-2 pb-4 border-b">
+                  <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+                    <span className="text-primary-foreground font-bold text-sm">FT</span>
+                  </div>
+                  <span className="font-semibold text-lg">FinanceTracker</span>
+                </div>
+
+                {/* Mobile Navigation Items */}
+                <div className="space-y-2">
+                  {navigationItems.map((item) => (
+                    <Button
+                      key={item.value}
+                      variant={activeTab === item.value ? "default" : "ghost"}
+                      className="w-full justify-start"
+                      onClick={() => handleTabChange(item.value)}
+                    >
+                      {item.label}
+                    </Button>
+                  ))}
+                </div>
+
+                {!isPremium && (
+                  <Link href="/pricing">
+                    <Button className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white">
+                      <Crown className="w-4 h-4 mr-2" />
+                      Upgrade to Pro
+                    </Button>
+                  </Link>
+                )}
+
+                {/* Mobile User Info */}
+                {user && (
+                  <div className="pt-4 border-t space-y-2">
+                    <div className="flex items-center space-x-2 p-2">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src="/placeholder.svg?height=32&width=32" alt="Profile" />
+                        <AvatarFallback className="text-xs">{getUserInitials()}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col">
+                        <p className="text-sm font-medium leading-none">{getUserDisplayName()}</p>
+                        <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                      </div>
+                    </div>
+                    <Button variant="ghost" className="w-full justify-start" onClick={handleProfileNavigation}>
+                      <User className="mr-2 h-4 w-4" />
+                      Profile Settings
+                    </Button>
+                    <Button variant="ghost" className="w-full justify-start" onClick={handleAccountNavigation}>
+                      <Settings className="mr-2 h-4 w-4" />
+                      Account Settings
+                    </Button>
+                    <Button variant="ghost" className="w-full justify-start" onClick={handleBillingNavigation}>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Billing Settings
+                    </Button>
+                    <LogoutButton className="w-full justify-start text-destructive" />
+                  </div>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
     </nav>

@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Progress } from "@/components/ui/progress"
-import { Loader2, CheckCircle, DollarSign, Home, CreditCard, MapPin, Target } from "lucide-react"
+import { Loader2, CheckCircle, DollarSign, Home, CreditCard, MapPin, Target, Crown } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 interface BudgetRecommendation {
@@ -28,6 +28,10 @@ interface OnboardingData {
   additionalInfo: string
 }
 
+interface BudgetOnboardingProps {
+  showPricingAfter?: boolean
+}
+
 const steps = [
   { id: "income", title: "Monthly Income", icon: DollarSign },
   { id: "expenses", title: "Fixed Expenses", icon: Home },
@@ -36,7 +40,7 @@ const steps = [
   { id: "goals", title: "Financial Goals", icon: Target },
 ]
 
-export default function BudgetOnboarding() {
+export default function BudgetOnboarding({ showPricingAfter = false }: BudgetOnboardingProps) {
   const [currentStep, setCurrentStep] = useState(0)
   const [data, setData] = useState<OnboardingData>({
     monthlyIncome: "",
@@ -105,7 +109,11 @@ export default function BudgetOnboarding() {
       })
 
       if (response.ok) {
-        router.push("/app")
+        if (showPricingAfter) {
+          router.push("/pricing")
+        } else {
+          router.push("/app")
+        }
       }
     } catch (error) {
       console.error("Failed to apply budget:", error)
@@ -142,12 +150,25 @@ export default function BudgetOnboarding() {
               <p className="text-gray-700">{recommendation.recommendation}</p>
             </div>
 
+            {showPricingAfter && (
+              <div className="p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Crown className="w-5 h-5 text-yellow-600" />
+                  <h3 className="font-semibold text-yellow-800">Unlock Advanced Features</h3>
+                </div>
+                <p className="text-sm text-yellow-700 mb-3">
+                  Get detailed analytics, expense tracking, and personalized insights to maximize your budget's
+                  potential.
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-3">
               <Button onClick={() => setIsComplete(false)} variant="outline" className="flex-1">
                 Adjust Details
               </Button>
               <Button onClick={applyRecommendation} className="flex-1">
-                Apply This Budget
+                {showPricingAfter ? "Continue & See Plans" : "Apply This Budget"}
               </Button>
             </div>
           </CardContent>
