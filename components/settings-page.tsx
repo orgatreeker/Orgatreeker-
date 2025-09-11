@@ -11,10 +11,16 @@ import { useTheme } from "@/contexts/theme-context"
 import { useCurrency, CURRENCIES } from "@/contexts/currency-context"
 import { BudgetSplitCustomization } from "@/components/budget-split-customization"
 import { LogoutButton } from "@/components/logout-button"
+import { useRouter } from "next/navigation"
 
 export function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const { selectedCurrency, setCurrency } = useCurrency()
+  const router = useRouter()
+
+  const handleUpgrade = () => {
+    router.push("/pricing")
+  }
 
   return (
     <div className="space-y-6">
@@ -146,7 +152,7 @@ export function SettingsPage() {
                 <Label className="text-base">Upgrade to Pro</Label>
                 <p className="text-sm text-muted-foreground">Unlock advanced features and unlimited budgets</p>
               </div>
-              <Button variant="outline" className="bg-transparent">
+              <Button variant="outline" className="bg-transparent" onClick={handleUpgrade}>
                 <CreditCard className="mr-2 h-4 w-4" />
                 Upgrade Plan
               </Button>
