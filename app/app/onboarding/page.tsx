@@ -1,16 +1,41 @@
-import { Suspense } from "react"
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
+"use client"
+
+import { Suspense, useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
 import BudgetOnboarding from "@/components/budget-onboarding"
+import type { User } from "@supabase/supabase-js"
 
-export default async function OnboardingPage() {
+export default function OnboardingPage() {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
   const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
 
-  if (!user) {
-    redirect("/auth")
+  useEffect(() => {
+    const getUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        router.push("/auth")
+        return
+      }
+
+      setUser(user)
+      setLoading(false)
+    }
+
+    getUser()
+  }, [router, supabase.auth])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div>Loading...</div>
+      </div>
+    )
   }
 
   return (

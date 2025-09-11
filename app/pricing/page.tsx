@@ -1,13 +1,35 @@
-import { Suspense } from "react"
-import { createClient } from "@/lib/supabase/server"
-import { PricingPage } from "@/components/pricing-page"
+"use client"
 
-export default async function Pricing() {
+import { Suspense, useEffect, useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+import { PricingPage } from "@/components/pricing-page"
+import type { User } from "@supabase/supabase-js"
+
+export default function Pricing() {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  useEffect(() => {
+    const getUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      setUser(user)
+      setLoading(false)
+    }
+
+    getUser()
+  }, [supabase.auth])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div>Loading...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
