@@ -73,7 +73,16 @@ export default function MainAppPage() {
             }
           } else if (fetchedProfile) {
             setProfile(fetchedProfile)
-            const isUserPremium = fetchedProfile.subscription_status === "active"
+            const isUserPremium =
+              fetchedProfile.subscription_status === "active" &&
+              (fetchedProfile.subscription_plan === "monthly" || fetchedProfile.subscription_plan === "yearly")
+
+            console.log("[v0] User premium status:", {
+              subscription_status: fetchedProfile.subscription_status,
+              subscription_plan: fetchedProfile.subscription_plan,
+              isPremium: isUserPremium,
+            })
+
             setIsPremium(isUserPremium)
           }
         } catch (profileError) {
@@ -134,7 +143,7 @@ export default function MainAppPage() {
       case "budget":
         return <BudgetPage isPremium={isPremium} />
       case "settings":
-        return <SettingsPage />
+        return <SettingsPage profile={profile} isPremium={isPremium} />
       case "profile":
         return <ProfileSettingsPage onBack={() => setActiveTab("dashboard")} />
       case "account":

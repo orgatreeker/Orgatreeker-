@@ -104,8 +104,11 @@ async function handleSubscriptionEvent(event: any, supabase: any) {
     variantId === 632299 ||
     variantId === Number.parseInt(process.env.LEMONSQUEEZY_ANNUAL_VARIANT_ID || "632299")
   ) {
-    planType = "annual"
+    planType = "yearly"
   }
+
+  const subscriptionStatus =
+    subscription.attributes.status === "active" && planType !== "free" ? "active" : subscription.attributes.status
 
   console.log(
     "[v0] Updating subscription for user:",
@@ -113,13 +116,15 @@ async function handleSubscriptionEvent(event: any, supabase: any) {
     "Plan:",
     planType,
     "Status:",
-    subscription.attributes.status,
+    subscriptionStatus,
+    "Variant ID:",
+    variantId,
   )
 
   const { error: updateError } = await supabase
     .from("profiles")
     .update({
-      subscription_status: subscription.attributes.status,
+      subscription_status: subscriptionStatus,
       subscription_plan: planType,
       lemon_squeezy_customer_id: subscription.attributes.customer_id,
       lemon_squeezy_subscription_id: subscription.id,
@@ -136,7 +141,9 @@ async function handleSubscriptionEvent(event: any, supabase: any) {
       "[v0] Successfully updated subscription for user:",
       userEmail,
       "New status:",
-      subscription.attributes.status,
+      subscriptionStatus,
+      "Plan:",
+      planType,
     )
   }
 }
