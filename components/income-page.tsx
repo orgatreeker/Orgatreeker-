@@ -27,7 +27,6 @@ import {
   DollarSign,
   TrendingUp,
   Loader2,
-  Lock,
   Crown,
   Target,
   PiggyBank,
@@ -74,10 +73,6 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
   })
 
   const supabase = createClient()
-
-  const handleUpgradeClick = () => {
-    router.push("/settings?tab=billing")
-  }
 
   useEffect(() => {
     checkUser()
@@ -181,11 +176,6 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
   }
 
   const handleOpenDialog = (source?: IncomeSource) => {
-    if (!source && !isPremium && incomeSources.length >= 5) {
-      setError("Free users can only add up to 5 income sources. Upgrade to Pro for unlimited income sources.")
-      return
-    }
-
     if (source) {
       setEditingSource(source)
       setFormData({
@@ -202,11 +192,6 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
 
   const handleSaveSource = async () => {
     if (!formData.name || !formData.category || !formData.amount || !user) return
-
-    if (!editingSource && !isPremium && incomeSources.length >= 5) {
-      setError("Free users can only add up to 5 income sources. Upgrade to Pro for unlimited income sources.")
-      return
-    }
 
     setIsSaving(true)
     setError(null)
@@ -287,14 +272,9 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {!isPremium && incomeSources.length >= 4 && (
-            <Badge variant="outline" className="text-xs">
-              {incomeSources.length}/5 sources used
-            </Badge>
-          )}
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => handleOpenDialog()} disabled={!isPremium && incomeSources.length >= 5}>
+              <Button onClick={() => handleOpenDialog()}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Income Source
               </Button>
@@ -365,28 +345,6 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
           </Dialog>
         </div>
       </div>
-
-      {!isPremium && incomeSources.length >= 5 && (
-        <Card className="border-orange-200 bg-orange-50/50">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-orange-100 rounded-full">
-                  <Lock className="h-4 w-4 text-orange-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-orange-900">Income Source Limit Reached</p>
-                  <p className="text-sm text-orange-700">You've reached the 5 income source limit for free users.</p>
-                </div>
-              </div>
-              <Button size="sm" className="bg-orange-600 hover:bg-orange-700" onClick={handleUpgradeClick}>
-                <Crown className="w-3 h-3 mr-1" />
-                Upgrade to Pro
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
@@ -491,9 +449,6 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
           <CardDescription>
             Manage your income sources for{" "}
             {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-            {!isPremium && (
-              <span className="ml-2 text-xs text-muted-foreground">({incomeSources.length}/5 sources used)</span>
-            )}
           </CardDescription>
         </CardHeader>
         <CardContent>

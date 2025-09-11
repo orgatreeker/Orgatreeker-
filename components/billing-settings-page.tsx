@@ -1,6 +1,7 @@
 "use client"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -17,8 +18,8 @@ export function BillingSettingsPage({ onBack }: BillingSettingsPageProps) {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
@@ -61,45 +62,9 @@ export function BillingSettingsPage({ onBack }: BillingSettingsPageProps) {
     }
   }
 
-  const initiatePayment = async (plan: "monthly" | "yearly") => {
-    setIsProcessingPayment(true)
-    setMessage(null)
-
-    try {
-      const response = await fetch("/api/phonepe/initiate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ plan }),
-      })
-
-      const result = await response.json()
-
-      if (result.success && result.paymentUrl) {
-        // Redirect to PhonePe payment page
-        window.location.href = result.paymentUrl
-      } else {
-        setMessage({
-          type: "error",
-          text: result.error || "Failed to initiate payment",
-        })
-      }
-    } catch (error) {
-      console.error("Payment initiation error:", error)
-      setMessage({
-        type: "error",
-        text: "Failed to initiate payment. Please try again.",
-      })
-    } finally {
-      setIsProcessingPayment(false)
-    }
+  const handleUpgrade = () => {
+    router.push("/pricing")
   }
-
-  const isSubscribed =
-    profile?.subscription_status === "active" &&
-    profile?.subscription_expires_at &&
-    new Date(profile.subscription_expires_at) > new Date()
 
   if (isLoading) {
     return (
@@ -144,22 +109,12 @@ export function BillingSettingsPage({ onBack }: BillingSettingsPageProps) {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold">
-                  {isSubscribed
-                    ? `${profile?.subscription_plan === "yearly" ? "Annual" : "Monthly"} Plan`
-                    : "Free Plan"}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {isSubscribed ? "All premium features unlocked" : "Perfect for getting started with basic features"}
-                </p>
+                <h3 className="text-lg font-semibold">Free Plan</h3>
+                <p className="text-sm text-muted-foreground">Perfect for getting started with basic features</p>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-bold">
-                  {isSubscribed ? (profile?.subscription_plan === "yearly" ? "$29" : "$5") : "$0"}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {isSubscribed ? (profile?.subscription_plan === "yearly" ? "per year" : "per month") : "per month"}
-                </p>
+                <p className="text-2xl font-bold">$0</p>
+                <p className="text-sm text-muted-foreground">per month</p>
               </div>
             </div>
 
@@ -168,19 +123,11 @@ export function BillingSettingsPage({ onBack }: BillingSettingsPageProps) {
             <div className="space-y-2">
               <h4 className="font-medium">Plan Features</h4>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Basic budget tracking</li>
-                <li>• Income and expense management</li>
-                {isSubscribed && (
-                  <>
-                    <li>• Unlimited income sources</li>
-                    <li>• Advanced analytics</li>
-                    <li>• Detailed financial insights</li>
-                    <li>• Export capabilities</li>
-                    <li>• Priority support</li>
-                  </>
-                )}
-                {!isSubscribed && <li>• Simple financial insights</li>}
-                <li>• Mobile-friendly interface</li>
+                <li>• Track income from up to 5 sources</li>
+                <li>• Dashboard with basic insights</li>
+                <li>• Manual expense tracking</li>
+                <li>• Customizable budgeting percentages</li>
+                <li>• Multi-currency support</li>
               </ul>
             </div>
 
@@ -188,94 +135,78 @@ export function BillingSettingsPage({ onBack }: BillingSettingsPageProps) {
               <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                 Active
               </Badge>
-              <Badge variant="secondary">{isSubscribed ? "Pro User" : "Free Tier"}</Badge>
-              {isSubscribed && profile?.subscription_expires_at && (
-                <Badge variant="outline">
-                  Expires {new Date(profile.subscription_expires_at).toLocaleDateString()}
-                </Badge>
-              )}
+              <Badge variant="secondary">Free Tier</Badge>
             </div>
           </CardContent>
         </Card>
 
-        {!isSubscribed && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Upgrade Options
-              </CardTitle>
-              <CardDescription>Unlock all premium features with our paid plans</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                {/* Monthly Plan */}
-                <div className="rounded-lg border p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold">Monthly Plan</h4>
-                    <Badge variant="default">Popular</Badge>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-3xl font-bold">$5</p>
-                    <p className="text-sm text-muted-foreground">per month</p>
-                  </div>
-                  <ul className="text-sm space-y-1">
-                    <li>• Unlimited income sources</li>
-                    <li>• Advanced budget analytics</li>
-                    <li>• Detailed financial insights</li>
-                    <li>• Export data capabilities</li>
-                    <li>• Priority support</li>
-                  </ul>
-                  <Button className="w-full" onClick={() => initiatePayment("monthly")} disabled={isProcessingPayment}>
-                    {isProcessingPayment ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      "Upgrade Monthly - $5"
-                    )}
-                  </Button>
-                </div>
-
-                {/* Annual Plan */}
-                <div className="rounded-lg border p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold">Annual Plan</h4>
-                    <Badge variant="secondary">Best Value</Badge>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-3xl font-bold">$29</p>
-                    <p className="text-sm text-muted-foreground">per year</p>
-                    <p className="text-xs text-green-600 font-medium">Save $31/year!</p>
-                  </div>
-                  <ul className="text-sm space-y-1">
-                    <li>• Everything in Monthly</li>
-                    <li>• 2 months free</li>
-                    <li>• Advanced reporting</li>
-                    <li>• Custom categories</li>
-                    <li>• Premium support</li>
-                  </ul>
-                  <Button
-                    variant="outline"
-                    className="w-full bg-transparent"
-                    onClick={() => initiatePayment("yearly")}
-                    disabled={isProcessingPayment}
-                  >
-                    {isProcessingPayment ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      "Upgrade Yearly - $29"
-                    )}
-                  </Button>
-                </div>
+        {/* Upgrade Options */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Upgrade to Pro
+            </CardTitle>
+            <CardDescription>Unlock premium features and unlimited access</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg border-2 border-primary p-6 space-y-4 bg-primary/5">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xl font-semibold flex items-center gap-2">
+                  <Crown className="h-5 w-5 text-primary" />
+                  Pro Plan
+                </h4>
+                <Badge variant="default">Most Popular</Badge>
               </div>
-            </CardContent>
-          </Card>
-        )}
+
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold">$12</span>
+                <span className="text-muted-foreground">/month</span>
+                <span className="text-sm text-muted-foreground">or $99/year (save $45)</span>
+              </div>
+
+              <ul className="text-sm space-y-2">
+                <li className="flex items-center gap-2">
+                  <div className="h-1.5 w-1.5 bg-green-500 rounded-full"></div>
+                  Everything in Free Plan
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="h-1.5 w-1.5 bg-green-500 rounded-full"></div>
+                  Unlimited income sources
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="h-1.5 w-1.5 bg-green-500 rounded-full"></div>
+                  Advanced insights & analytics
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="h-1.5 w-1.5 bg-green-500 rounded-full"></div>
+                  Full savings breakdown (50/30/20 or custom)
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="h-1.5 w-1.5 bg-green-500 rounded-full"></div>
+                  Detailed subcategory tracking
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="h-1.5 w-1.5 bg-green-500 rounded-full"></div>
+                  Multi-month financial history
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="h-1.5 w-1.5 bg-green-500 rounded-full"></div>
+                  Priority email support
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="h-1.5 w-1.5 bg-green-500 rounded-full"></div>
+                  Export data to CSV/Excel
+                </li>
+              </ul>
+
+              <Button className="w-full bg-primary hover:bg-primary/90" onClick={handleUpgrade}>
+                <Crown className="mr-2 h-4 w-4" />
+                Upgrade to Pro
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Billing History */}
         <Card>
@@ -293,13 +224,8 @@ export function BillingSettingsPage({ onBack }: BillingSettingsPageProps) {
               <p className="text-sm text-muted-foreground mb-4">
                 You're currently on the free plan. Upgrade to a paid plan to see billing history here.
               </p>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  setMessage({ type: "error", text: "Billing history will appear after your first payment" })
-                }
-              >
-                View All Invoices
+              <Button variant="outline" onClick={handleUpgrade}>
+                Upgrade to See History
               </Button>
             </div>
           </CardContent>
@@ -319,10 +245,7 @@ export function BillingSettingsPage({ onBack }: BillingSettingsPageProps) {
               <CreditCard className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <h3 className="font-medium mb-2">No payment method added</h3>
               <p className="text-sm text-muted-foreground mb-4">Add a payment method to upgrade to a premium plan</p>
-              <Button
-                variant="outline"
-                onClick={() => setMessage({ type: "error", text: "Payment method management coming soon!" })}
-              >
+              <Button variant="outline" onClick={handleUpgrade}>
                 Add Payment Method
               </Button>
             </div>

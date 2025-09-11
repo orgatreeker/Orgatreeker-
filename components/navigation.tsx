@@ -13,16 +13,19 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { User, CreditCard, Menu, Settings } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { User, CreditCard, Menu, Settings, Crown } from "lucide-react"
 import { LogoutButton } from "@/components/logout-button"
 import { getProfile, createProfile, type Profile } from "@/lib/profile-utils"
 
 interface NavigationProps {
   activeTab: string
   onTabChange: (tab: string) => void
+  isPremium?: boolean
+  profile?: any
 }
 
-export function Navigation({ activeTab, onTabChange }: NavigationProps) {
+export function Navigation({ activeTab, onTabChange, isPremium = false, profile: passedProfile }: NavigationProps) {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -43,7 +46,9 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
 
         setUser(user)
 
-        if (user) {
+        if (passedProfile) {
+          setProfile(passedProfile)
+        } else if (user) {
           let profileData = await getProfile(user.id)
 
           if (!profileData) {
@@ -89,7 +94,7 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
     })
 
     return () => subscription.unsubscribe()
-  }, [supabase.auth])
+  }, [supabase.auth, passedProfile])
 
   const getUserInitials = () => {
     if (!user) return "U"
@@ -140,6 +145,15 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
           </div>
           <span className="font-semibold text-base md:text-lg hidden sm:block">FinanceTracker</span>
           <span className="font-semibold text-base md:text-lg sm:hidden">FT</span>
+          {isPremium && (
+            <Badge
+              variant="secondary"
+              className="hidden sm:flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+            >
+              <Crown className="h-3 w-3" />
+              Pro
+            </Badge>
+          )}
         </div>
 
         {/* Desktop Navigation Tabs - Hidden on mobile */}
@@ -171,6 +185,15 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                     <span className="text-primary-foreground font-bold text-sm">FT</span>
                   </div>
                   <span className="font-semibold text-lg">FinanceTracker</span>
+                  {isPremium && (
+                    <Badge
+                      variant="secondary"
+                      className="flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+                    >
+                      <Crown className="h-3 w-3" />
+                      Pro
+                    </Badge>
+                  )}
                 </div>
 
                 {/* Mobile Navigation Items */}
@@ -235,6 +258,11 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                     {getUserInitials()}
                   </AvatarFallback>
                 </Avatar>
+                {isPremium && (
+                  <div className="absolute -top-1 -right-1 h-4 w-4 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full flex items-center justify-center">
+                    <Crown className="h-2.5 w-2.5 text-white" />
+                  </div>
+                )}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -247,7 +275,18 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
               {user && (
                 <>
                   <div className="flex flex-col space-y-1 p-3 bg-muted/50 rounded-md mx-1 mb-1">
-                    <p className="text-sm font-medium leading-none text-foreground">{getUserDisplayName()}</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium leading-none text-foreground">{getUserDisplayName()}</p>
+                      {isPremium && (
+                        <Badge
+                          variant="secondary"
+                          className="text-xs bg-gradient-to-r from-amber-500 to-orange-500 text-white"
+                        >
+                          <Crown className="h-3 w-3 mr-1" />
+                          Pro
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-xs leading-none text-muted-foreground truncate">{user.email}</p>
                   </div>
                   <DropdownMenuSeparator className="my-1" />
