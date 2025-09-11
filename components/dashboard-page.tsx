@@ -401,7 +401,9 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Growth</CardTitle>
-            {growthPercentage > 0 ? (
+            {!isPremium ? (
+              <Lock className="h-4 w-4 text-muted-foreground" />
+            ) : growthPercentage > 0 ? (
               <TrendingUp className="h-4 w-4 text-green-600" />
             ) : (
               <TrendingDown className="h-4 w-4 text-red-600" />
@@ -411,12 +413,7 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
             {!isPremium ? (
               <div className="space-y-2">
                 <div className="text-2xl font-bold text-muted-foreground">--</div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-xs h-6 bg-transparent"
-                  onClick={() => router.push("/")}
-                >
+                <Button size="sm" variant="outline" className="text-xs h-6 bg-transparent">
                   <Crown className="w-3 h-3 mr-1" />
                   Upgrade to Pro
                 </Button>
@@ -504,7 +501,7 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
                 <div className="text-center space-y-2">
                   <p className="text-sm font-medium">Advanced Analytics Locked</p>
                   <p className="text-xs text-muted-foreground">Upgrade to Pro to see detailed expense breakdowns</p>
-                  <Button size="sm" className="mt-2" onClick={() => router.push("/")}>
+                  <Button size="sm" className="mt-2">
                     <Crown className="w-3 h-3 mr-1" />
                     Upgrade to Pro
                   </Button>

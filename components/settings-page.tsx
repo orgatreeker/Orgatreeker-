@@ -6,69 +6,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import {
-  Mail,
-  Globe,
-  Moon,
-  Sun,
-  HelpCircle,
-  User,
-  Settings,
-  CreditCard,
-  Camera,
-  Shield,
-  Trash2,
-  Crown,
-} from "lucide-react"
+import { Mail, Globe, Moon, Sun, HelpCircle, User, Settings, CreditCard, Camera, Shield, Trash2 } from "lucide-react"
 import { useTheme } from "@/contexts/theme-context"
 import { useCurrency, CURRENCIES } from "@/contexts/currency-context"
 import { BudgetSplitCustomization } from "@/components/budget-split-customization"
 import { LogoutButton } from "@/components/logout-button"
-import { useRouter } from "next/navigation"
 
-interface SettingsPageProps {
-  profile?: any
-  isPremium?: boolean
-}
-
-export function SettingsPage({ profile, isPremium = false }: SettingsPageProps) {
+export function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const { selectedCurrency, setCurrency } = useCurrency()
-  const router = useRouter()
-
-  const handleUpgrade = () => {
-    router.push("/pricing")
-  }
-
-  const getPlanInfo = () => {
-    if (!profile) return { name: "Free Plan", badge: "Free Plan", variant: "secondary" as const }
-
-    if (profile.subscription_status === "active") {
-      if (profile.subscription_plan === "monthly") {
-        return { name: "Pro Monthly", badge: "Pro Monthly", variant: "default" as const }
-      } else if (profile.subscription_plan === "yearly") {
-        return { name: "Pro Yearly", badge: "Pro Yearly", variant: "default" as const }
-      }
-    }
-
-    return { name: "Free Plan", badge: "Free Plan", variant: "secondary" as const }
-  }
-
-  const planInfo = getPlanInfo()
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <div className="flex items-center gap-3">
-          <Badge variant="secondary">App Settings</Badge>
-          {isPremium && (
-            <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
-              <Crown className="w-3 h-3 mr-1" />
-              Pro
-            </Badge>
-          )}
-        </div>
+        <Badge variant="secondary">App Settings</Badge>
       </div>
 
       <div className="grid gap-6">
@@ -110,9 +62,7 @@ export function SettingsPage({ profile, isPremium = false }: SettingsPageProps) 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label className="text-base">Email Address</Label>
-                <p className="text-sm text-muted-foreground">
-                  {profile?.email || "View your account email (managed by Google)"}
-                </p>
+                <p className="text-sm text-muted-foreground">View your account email (managed by Google)</p>
               </div>
               <Button variant="outline" disabled className="bg-muted">
                 <Mail className="mr-2 h-4 w-4" />
@@ -184,49 +134,23 @@ export function SettingsPage({ profile, isPremium = false }: SettingsPageProps) 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label className="text-base">Current Plan</Label>
-                <p className="text-sm text-muted-foreground">
-                  {isPremium ? `You are currently on the ${planInfo.name}` : "You are currently on the Free plan"}
-                </p>
-                {isPremium && profile?.subscription_current_period_end && (
-                  <p className="text-xs text-muted-foreground">
-                    Next billing: {new Date(profile.subscription_current_period_end).toLocaleDateString()}
-                  </p>
-                )}
+                <p className="text-sm text-muted-foreground">You are currently on the Free plan</p>
               </div>
-              <Badge
-                variant={planInfo.variant}
-                className={isPremium ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-white" : ""}
-              >
-                {isPremium && <Crown className="w-3 h-3 mr-1" />}
-                {planInfo.badge}
-              </Badge>
+              <Badge variant="secondary">Free Plan</Badge>
             </div>
 
             <Separator />
 
-            {!isPremium ? (
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-base">Upgrade to Pro</Label>
-                  <p className="text-sm text-muted-foreground">Unlock advanced features and unlimited budgets</p>
-                </div>
-                <Button variant="outline" className="bg-transparent" onClick={handleUpgrade}>
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Upgrade Plan
-                </Button>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base">Upgrade to Pro</Label>
+                <p className="text-sm text-muted-foreground">Unlock advanced features and unlimited budgets</p>
               </div>
-            ) : (
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-base">Manage Subscription</Label>
-                  <p className="text-sm text-muted-foreground">Update payment method or cancel subscription</p>
-                </div>
-                <Button variant="outline" className="bg-transparent">
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Manage Billing
-                </Button>
-              </div>
-            )}
+              <Button variant="outline" className="bg-transparent">
+                <CreditCard className="mr-2 h-4 w-4" />
+                Upgrade Plan
+              </Button>
+            </div>
 
             <Separator />
 
@@ -235,7 +159,7 @@ export function SettingsPage({ profile, isPremium = false }: SettingsPageProps) 
                 <Label className="text-base">Billing History</Label>
                 <p className="text-sm text-muted-foreground">View your payment history and invoices</p>
               </div>
-              <Button variant="outline" disabled={!isPremium} className={!isPremium ? "bg-muted" : "bg-transparent"}>
+              <Button variant="outline" disabled className="bg-muted">
                 <Mail className="mr-2 h-4 w-4" />
                 View History
               </Button>
