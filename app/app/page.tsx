@@ -24,23 +24,19 @@ export default function MainAppPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Auth timeout")), 10000))
-
-        const authPromise = supabase.auth.getSession()
-
         const {
           data: { session },
           error,
-        } = (await Promise.race([authPromise, timeoutPromise])) as any
+        } = await supabase.auth.getSession()
 
         if (error) {
           console.error("Auth error:", error)
-          router.push("/")
+          router.push("/auth/login")
           return
         }
 
         if (!session) {
-          router.push("/")
+          router.push("/auth/login")
           return
         }
 
@@ -48,7 +44,7 @@ export default function MainAppPage() {
         setIsAuthenticated(true)
 
         try {
-          const { data: fetchedProfile, error: profileError } = await supabase
+          let { data: fetchedProfile, error: profileError } = await supabase
             .from("profiles")
             .select("*")
             .eq("id", session.user.id)
@@ -67,17 +63,17 @@ export default function MainAppPage() {
               .select()
               .single()
 
-            if (newProfile) {
-              setProfile(newProfile)
-              setIsPremium(false)
-            }
-          } else if (fetchedProfile) {
+            fetchedProfile = newProfile
+          }
+
+          if (fetchedProfile) {
             setProfile(fetchedProfile)
+
             const isUserPremium =
               fetchedProfile.subscription_status === "active" &&
               (fetchedProfile.subscription_plan === "monthly" || fetchedProfile.subscription_plan === "yearly")
 
-            console.log("[v0] User premium status:", {
+            console.log("[v0] Premium status check:", {
               subscription_status: fetchedProfile.subscription_status,
               subscription_plan: fetchedProfile.subscription_plan,
               isPremium: isUserPremium,
@@ -87,16 +83,18 @@ export default function MainAppPage() {
           }
         } catch (profileError) {
           console.error("Profile error:", profileError)
-          setProfile({
+          const fallbackProfile = {
             id: session.user.id,
             email: session.user.email,
             subscription_status: "free",
-          })
+            subscription_plan: "free",
+          }
+          setProfile(fallbackProfile)
           setIsPremium(false)
         }
       } catch (error) {
         console.error("Error checking auth:", error)
-        router.push("/")
+        router.push("/auth/login")
       } finally {
         setIsLoading(false)
       }

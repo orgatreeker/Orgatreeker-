@@ -22,11 +22,25 @@ export function PricingPage({ user }: PricingPageProps) {
 
   const handleUpgrade = (plan: "monthly" | "annual") => {
     const baseUrl = checkoutUrls[plan]
-    const checkoutUrl = user?.email
-      ? `${baseUrl}?checkout[custom][user_email]=${encodeURIComponent(user.email)}&checkout[email]=${encodeURIComponent(user.email)}`
-      : baseUrl
+
+    let checkoutUrl = baseUrl
+
+    if (user?.email) {
+      const params = new URLSearchParams()
+      params.set("checkout[custom][user_email]", user.email)
+      params.set("checkout[email]", user.email)
+      params.set("checkout[name]", user.user_metadata?.full_name || user.email.split("@")[0])
+
+      checkoutUrl = `${baseUrl}?${params.toString()}`
+    }
 
     console.log("[v0] Opening checkout with URL:", checkoutUrl)
+    console.log("[v0] User data being passed:", {
+      email: user?.email,
+      name: user?.user_metadata?.full_name,
+      plan: plan,
+    })
+
     window.open(checkoutUrl, "_blank")
   }
 
@@ -183,10 +197,17 @@ export function PricingPage({ user }: PricingPageProps) {
               <Button
                 className="w-full mt-6 bg-primary hover:bg-primary/90"
                 onClick={() => handleUpgrade(billingCycle)}
+                disabled={!user}
               >
                 <Crown className="h-4 w-4 mr-2" />
-                Start Pro Trial
+                {user ? "Start Pro Trial" : "Sign In to Subscribe"}
               </Button>
+
+              {!user && (
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  Please sign in to subscribe to Pro plan
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
