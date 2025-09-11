@@ -8,15 +8,15 @@ export async function POST(request: NextRequest) {
     const signature = request.headers.get("x-signature")
 
     if (!signature) {
-      console.error("No signature provided")
+      console.error("[v0] No signature provided")
       return NextResponse.json({ error: "No signature provided" }, { status: 400 })
     }
 
-    const signingSecret = "9531808991!Aa"
+    const signingSecret = process.env.LEMONSQUEEZY_WEBHOOK_SECRET || "9531808991!Aa"
     const expectedSignature = crypto.createHmac("sha256", signingSecret).update(body).digest("hex")
 
     if (signature !== expectedSignature) {
-      console.error("Invalid signature")
+      console.error("[v0] Invalid signature")
       return NextResponse.json({ error: "Invalid signature" }, { status: 400 })
     }
 
@@ -53,20 +53,15 @@ export async function POST(request: NextRequest) {
 
 async function handleSubscriptionEvent(event: any, supabase: any) {
   const subscription = event.data
-  console.log("[v0] Processing subscription event:", JSON.stringify(subscription, null, 2))
+  console.log("[v0] Processing subscription event for ID:", subscription.id)
 
   let userEmail = null
 
-  // Try custom data first
   if (subscription.attributes.custom_data?.user_email) {
     userEmail = subscription.attributes.custom_data.user_email
-  }
-  // Try user_email field
-  else if (subscription.attributes.user_email) {
+  } else if (subscription.attributes.user_email) {
     userEmail = subscription.attributes.user_email
-  }
-  // Try getting from customer data if available
-  else if (event.included) {
+  } else if (event.included) {
     const customer = event.included.find((item: any) => item.type === "customers")
     if (customer?.attributes?.email) {
       userEmail = customer.attributes.email
@@ -76,11 +71,7 @@ async function handleSubscriptionEvent(event: any, supabase: any) {
   console.log("[v0] Extracted user email:", userEmail)
 
   if (!userEmail) {
-    console.error("[v0] No user email found in subscription event. Available data:", {
-      custom_data: subscription.attributes.custom_data,
-      user_email: subscription.attributes.user_email,
-      included: event.included?.map((item: any) => ({ type: item.type, email: item.attributes?.email })),
-    })
+    console.error("[v0] No user email found in subscription event")
     return
   }
 
@@ -107,29 +98,16 @@ async function handleSubscriptionEvent(event: any, supabase: any) {
     planType = "yearly"
   }
 
-  const subscriptionStatus =
-    subscription.attributes.status === "active" && planType !== "free" ? "active" : subscription.attributes.status
+  const subscriptionStatus = subscription.attributes.status === "active" ? "active" : subscription.attributes.status
 
-  console.log(
-    "[v0] Updating subscription for user:",
-    userEmail,
-    "Plan:",
-    planType,
-    "Status:",
-    subscriptionStatus,
-    "Variant ID:",
-    variantId,
-  )
+  console.log("[v0] Updating subscription for user:", userEmail, "Plan:", planType, "Status:", subscriptionStatus)
 
   const { error: updateError } = await supabase
     .from("profiles")
     .update({
       subscription_status: subscriptionStatus,
       subscription_plan: planType,
-      lemon_squeezy_customer_id: subscription.attributes.customer_id,
-      lemon_squeezy_subscription_id: subscription.id,
-      subscription_current_period_start: subscription.attributes.current_period_start,
-      subscription_current_period_end: subscription.attributes.current_period_end,
+      subscription_updated_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq("id", profile.id)
@@ -140,11 +118,35 @@ async function handleSubscriptionEvent(event: any, supabase: any) {
     console.log(
       "[v0] Successfully updated subscription for user:",
       userEmail,
-      "New status:",
+      "Status:",
       subscriptionStatus,
       "Plan:",
       planType,
     )
+  }
+
+  const { error: subscriptionInsertError } = await supabase.from("subscriptions").upsert(
+    {
+      lemon_squeezy_id: subscription.id.toString(),
+      user_id: profile.id,
+      email: userEmail,
+      status: subscriptionStatus,
+      plan_type: planType,
+      variant_id: variantId,
+      variant_name: subscription.attributes.variant_name || planType,
+      current_period_start: subscription.attributes.current_period_start,
+      current_period_end: subscription.attributes.current_period_end,
+      updated_at: new Date().toISOString(),
+    },
+    {
+      onConflict: "lemon_squeezy_id",
+    },
+  )
+
+  if (subscriptionInsertError) {
+    console.error("[v0] Error inserting subscription record:", subscriptionInsertError)
+  } else {
+    console.log("[v0] Successfully inserted/updated subscription record")
   }
 }
 
@@ -158,11 +160,14 @@ async function handleSubscriptionCancellation(event: any, supabase: any) {
     return
   }
 
+  console.log("[v0] Cancelling subscription for user:", userEmail)
+
   const { error: updateError } = await supabase
     .from("profiles")
     .update({
       subscription_status: "cancelled",
       subscription_plan: "free",
+      subscription_updated_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq("email", userEmail)
@@ -172,11 +177,23 @@ async function handleSubscriptionCancellation(event: any, supabase: any) {
   } else {
     console.log("[v0] Successfully cancelled subscription for user:", userEmail)
   }
+
+  const { error: subscriptionUpdateError } = await supabase
+    .from("subscriptions")
+    .update({
+      status: "cancelled",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("lemon_squeezy_id", subscription.id.toString())
+
+  if (subscriptionUpdateError) {
+    console.error("[v0] Error updating subscription record:", subscriptionUpdateError)
+  }
 }
 
 async function handleOrderCreated(event: any, supabase: any) {
   const order = event.data
-  console.log("[v0] Processing order event:", JSON.stringify(order, null, 2))
+  console.log("[v0] Processing order event for order ID:", order.id)
 
   let userEmail = null
 
@@ -197,7 +214,6 @@ async function handleOrderCreated(event: any, supabase: any) {
     const { error: logError } = await supabase
       .from("profiles")
       .update({
-        last_payment_date: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("email", userEmail)
