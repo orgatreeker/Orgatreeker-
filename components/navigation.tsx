@@ -13,8 +13,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Badge } from "@/components/ui/badge"
-import { User, Menu, Settings, Crown } from "lucide-react"
+import { User, Menu, Settings } from "lucide-react"
 import { LogoutButton } from "@/components/logout-button"
 import { getProfile, createProfile, type Profile } from "@/lib/profile-utils"
 
@@ -124,10 +123,6 @@ export function Navigation({ activeTab, onTabChange, isPremium = true, profile: 
     onTabChange("account")
   }
 
-  const handleBillingNavigation = () => {
-    onTabChange("billing")
-  }
-
   const navigationItems = [
     { value: "dashboard", label: "Dashboard" },
     { value: "income", label: "Income" },
@@ -138,20 +133,12 @@ export function Navigation({ activeTab, onTabChange, isPremium = true, profile: 
   return (
     <nav className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
       <div className="flex h-14 md:h-16 items-center justify-between px-4 md:px-6">
-        {/* Logo and Brand */}
         <div className="flex items-center space-x-2 md:space-x-4">
           <div className="h-6 w-6 md:h-8 md:w-8 rounded-lg bg-primary flex items-center justify-center">
             <span className="text-primary-foreground font-bold text-xs md:text-sm">FT</span>
           </div>
           <span className="font-semibold text-base md:text-lg hidden sm:block">FinanceTracker</span>
           <span className="font-semibold text-base md:text-lg sm:hidden">FT</span>
-          <Badge
-            variant="secondary"
-            className="hidden sm:flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white"
-          >
-            <Crown className="h-3 w-3" />
-            Pro
-          </Badge>
         </div>
 
         {/* Desktop Navigation Tabs - Hidden on mobile */}
@@ -183,13 +170,6 @@ export function Navigation({ activeTab, onTabChange, isPremium = true, profile: 
                     <span className="text-primary-foreground font-bold text-sm">FT</span>
                   </div>
                   <span className="font-semibold text-lg">FinanceTracker</span>
-                  <Badge
-                    variant="secondary"
-                    className="flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white"
-                  >
-                    <Crown className="h-3 w-3" />
-                    Pro
-                  </Badge>
                 </div>
 
                 {/* Mobile Navigation Items */}
@@ -235,14 +215,12 @@ export function Navigation({ activeTab, onTabChange, isPremium = true, profile: 
           </Sheet>
         </div>
 
-        {/* Desktop Profile Dropdown - Hidden on mobile */}
         <div className="hidden md:block">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 className="relative h-8 w-8 md:h-10 md:w-10 rounded-full hover:bg-accent transition-colors"
-                onClick={() => console.log("[v0] Profile dropdown clicked")}
               >
                 <Avatar className="h-8 w-8 md:h-10 md:w-10">
                   <AvatarImage src="/placeholder.svg?height=40&width=40" alt="Profile" />
@@ -250,9 +228,6 @@ export function Navigation({ activeTab, onTabChange, isPremium = true, profile: 
                     {getUserInitials()}
                   </AvatarFallback>
                 </Avatar>
-                <div className="absolute -top-1 -right-1 h-4 w-4 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full flex items-center justify-center">
-                  <Crown className="h-2.5 w-2.5 text-white" />
-                </div>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -265,36 +240,21 @@ export function Navigation({ activeTab, onTabChange, isPremium = true, profile: 
               {user && (
                 <>
                   <div className="flex flex-col space-y-1 p-3 bg-muted/50 rounded-md mx-1 mb-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium leading-none text-foreground">{getUserDisplayName()}</p>
-                      <Badge
-                        variant="secondary"
-                        className="text-xs bg-gradient-to-r from-amber-500 to-orange-500 text-white"
-                      >
-                        <Crown className="h-3 w-3 mr-1" />
-                        Pro
-                      </Badge>
-                    </div>
+                    <p className="text-sm font-medium leading-none text-foreground">{getUserDisplayName()}</p>
                     <p className="text-xs leading-none text-muted-foreground truncate">{user.email}</p>
                   </div>
                   <DropdownMenuSeparator className="my-1" />
                 </>
               )}
               <DropdownMenuItem
-                onClick={() => {
-                  console.log("[v0] Profile Settings clicked")
-                  handleProfileNavigation()
-                }}
+                onClick={handleProfileNavigation}
                 className="cursor-pointer hover:bg-accent focus:bg-accent rounded-md mx-1 my-0.5 flex items-center gap-2 p-2"
               >
                 <User className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">Profile Settings</span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => {
-                  console.log("[v0] Account Settings clicked")
-                  handleAccountNavigation()
-                }}
+                onClick={handleAccountNavigation}
                 className="cursor-pointer hover:bg-accent focus:bg-accent rounded-md mx-1 my-0.5 flex items-center gap-2 p-2"
               >
                 <Settings className="h-4 w-4 text-muted-foreground" />

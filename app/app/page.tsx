@@ -17,33 +17,29 @@ export default function MainAppPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
-  const [isPremium, setIsPremium] = useState(true)
+  const [isPremium, setIsPremium] = useState(true) // Always true - all features unlocked
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        console.log("[v0] Checking authentication...")
-
         const {
           data: { session },
           error,
         } = await supabase.auth.getSession()
 
         if (error) {
-          console.error("[v0] Auth error:", error)
+          console.error("Auth error:", error)
           router.push("/auth/login")
           return
         }
 
         if (!session) {
-          console.log("[v0] No session found, redirecting to login")
           router.push("/auth/login")
           return
         }
 
-        console.log("[v0] User authenticated:", session.user.email)
         setUser(session.user)
         setIsAuthenticated(true)
 
@@ -55,16 +51,14 @@ export default function MainAppPage() {
             .single()
 
           if (profileError && profileError.code === "PGRST116") {
-            console.log("[v0] Creating new profile for user:", session.user.email)
-
             const { data: newProfile, error: insertError } = await supabase
               .from("profiles")
               .insert({
                 id: session.user.id,
                 email: session.user.email,
                 full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "",
-                subscription_status: "active", // Set to active by default
-                subscription_plan: "pro", // Set to pro by default
+                subscription_status: "active",
+                subscription_plan: "pro",
                 onboarding_completed: false,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
@@ -73,37 +67,32 @@ export default function MainAppPage() {
               .single()
 
             if (insertError) {
-              console.error("[v0] Error creating profile:", insertError)
+              console.error("Error creating profile:", insertError)
               throw insertError
             }
 
             fetchedProfile = newProfile
-            console.log("[v0] Successfully created new profile")
           }
 
           if (fetchedProfile) {
             setProfile(fetchedProfile)
-
-            console.log("[v0] ✅ User has FULL ACCESS - all features unlocked!")
-            setIsPremium(true)
+            setIsPremium(true) // Always set to true for all users
           }
         } catch (profileError) {
-          console.error("[v0] Profile error:", profileError)
-
+          console.error("Profile error:", profileError)
           const fallbackProfile = {
             id: session.user.id,
             email: session.user.email,
             full_name: session.user.user_metadata?.full_name || "",
-            subscription_status: "active", // Set to active by default
-            subscription_plan: "pro", // Set to pro by default
+            subscription_status: "active",
+            subscription_plan: "pro",
             onboarding_completed: false,
           }
           setProfile(fallbackProfile)
           setIsPremium(true)
-          console.log("[v0] Using fallback profile with full access")
         }
       } catch (error) {
-        console.error("[v0] Error checking auth:", error)
+        console.error("Error checking auth:", error)
         router.push("/auth/login")
       } finally {
         setIsLoading(false)
@@ -115,18 +104,13 @@ export default function MainAppPage() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("[v0] Auth state changed:", event)
-
       if (event === "SIGNED_OUT" || !session) {
-        console.log("[v0] User signed out, clearing state")
         setIsAuthenticated(false)
         setUser(null)
         setProfile(null)
         setIsPremium(false)
         router.push("/")
       } else if (event === "SIGNED_IN" && session) {
-        console.log("[v0] User signed in, refreshing profile")
-        // Refresh the page to reload profile data
         window.location.reload()
       }
     })
@@ -140,7 +124,6 @@ export default function MainAppPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground text-sm md:text-base">Loading your dashboard...</p>
-          <p className="text-xs text-muted-foreground mt-2">All features unlocked!</p>
         </div>
       </div>
     )
