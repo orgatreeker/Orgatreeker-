@@ -1,10 +1,9 @@
 "use client"
 
-import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Check, X, Crown, ArrowLeft } from "lucide-react"
+import { Check, Crown } from "lucide-react"
 import { useRouter } from "next/navigation"
 
 interface PricingPageProps {
@@ -12,7 +11,6 @@ interface PricingPageProps {
 }
 
 export function PricingPage({ user }: PricingPageProps) {
-  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly")
   const router = useRouter()
 
   const checkoutUrls = {
@@ -23,63 +21,35 @@ export function PricingPage({ user }: PricingPageProps) {
   const handleUpgrade = (plan: "monthly" | "annual") => {
     const baseUrl = checkoutUrls[plan]
 
-    let checkoutUrl = baseUrl
+    const params = new URLSearchParams()
+    params.set("checkout[custom][redirect_url]", `${window.location.origin}/auth/login`)
 
-    if (user?.email) {
-      const params = new URLSearchParams()
-      params.set("checkout[custom][user_email]", user.email)
-      params.set("checkout[email]", user.email)
-      params.set("checkout[name]", user.user_metadata?.full_name || user.email.split("@")[0])
-
-      checkoutUrl = `${baseUrl}?${params.toString()}`
-    }
-
-    console.log("[v0] Opening checkout with URL:", checkoutUrl)
-    console.log("[v0] User data being passed:", {
-      email: user?.email,
-      name: user?.user_metadata?.full_name,
-      plan: plan,
-    })
-
-    window.open(checkoutUrl, "_blank")
+    const checkoutUrl = `${baseUrl}?${params.toString()}`
+    window.location.href = checkoutUrl
   }
 
-  const features = {
-    free: [
-      "Track income from up to 5 sources",
-      "Dashboard with basic insights",
-      "Manual expense tracking",
-      "Customizable budgeting percentages",
-      "Multi-currency support",
-    ],
-    premium: [
-      "Everything in Free Plan",
-      "Unlimited income sources",
-      "Advanced insights & analytics",
-      "Full savings breakdown (50/30/20 or custom)",
-      "Detailed subcategory tracking",
-      "Multi-month financial history",
-      "Priority email support",
-      "Export data to CSV/Excel",
-    ],
-  }
+  const features = [
+    "Unlimited income sources",
+    "Advanced insights & analytics",
+    "Full savings breakdown (50/30/20 or custom)",
+    "Detailed subcategory tracking",
+    "Multi-month financial history",
+    "Priority email support",
+    "Export data to CSV/Excel",
+    "Multi-currency support",
+    "Customizable budgeting percentages",
+    "Real-time dashboard updates",
+  ]
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="sm" onClick={() => (user ? router.push("/app") : router.push("/"))}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              {user ? "Back to App" : "Back to Home"}
-            </Button>
-            <div className="flex items-center gap-2">
-              <Crown className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold">Orgatreeker</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <Crown className="h-6 w-6 text-primary" />
+            <span className="text-xl font-bold">Orgatreeker</span>
           </div>
-          {user && <Badge variant="secondary">Signed in as {user.email}</Badge>}
         </div>
       </div>
 
@@ -87,45 +57,27 @@ export function PricingPage({ user }: PricingPageProps) {
         {/* Hero Section */}
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">Simple, Transparent Pricing</h1>
-          <p className="text-xl text-muted-foreground mb-8">
-            Start free and upgrade when you're ready for advanced features
-          </p>
-
-          {/* Billing Toggle */}
-          <div className="flex items-center justify-center gap-4 mb-8">
-            <Button
-              variant={billingCycle === "monthly" ? "default" : "outline"}
-              onClick={() => setBillingCycle("monthly")}
-              className="px-6"
-            >
-              Monthly
-            </Button>
-            <Button
-              variant={billingCycle === "annual" ? "default" : "outline"}
-              onClick={() => setBillingCycle("annual")}
-              className="px-6 relative"
-            >
-              Annual
-              <Badge className="absolute -top-2 -right-2 bg-green-500 text-white text-xs">Save $45</Badge>
-            </Button>
-          </div>
+          <p className="text-xl text-muted-foreground mb-8">Choose the plan that works best for you</p>
         </div>
 
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          {/* Free Plan */}
+          {/* Monthly Plan */}
           <Card className="relative">
             <CardHeader>
-              <CardTitle className="text-2xl">Free Plan</CardTitle>
-              <CardDescription>Forever free</CardDescription>
+              <CardTitle className="text-2xl flex items-center gap-2">
+                <Crown className="h-6 w-6 text-primary" />
+                Monthly Plan
+              </CardTitle>
+              <CardDescription>Perfect for getting started</CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold">$0</span>
+                <span className="text-4xl font-bold">$12</span>
                 <span className="text-muted-foreground">/month</span>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <ul className="space-y-3">
-                {features.free.map((feature, index) => (
+                {features.map((feature, index) => (
                   <li key={index} className="flex items-center gap-3">
                     <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
                     <span className="text-sm">{feature}</span>
@@ -133,35 +85,14 @@ export function PricingPage({ user }: PricingPageProps) {
                 ))}
               </ul>
 
-              {/* Limitations */}
-              <div className="pt-4 border-t">
-                <ul className="space-y-2">
-                  <li className="flex items-center gap-3 text-muted-foreground">
-                    <X className="h-4 w-4 text-red-500 flex-shrink-0" />
-                    <span className="text-sm">Advanced analytics & insights</span>
-                  </li>
-                  <li className="flex items-center gap-3 text-muted-foreground">
-                    <X className="h-4 w-4 text-red-500 flex-shrink-0" />
-                    <span className="text-sm">Unlimited income sources</span>
-                  </li>
-                  <li className="flex items-center gap-3 text-muted-foreground">
-                    <X className="h-4 w-4 text-red-500 flex-shrink-0" />
-                    <span className="text-sm">Detailed subcategory tracking</span>
-                  </li>
-                </ul>
-              </div>
-
-              <Button
-                variant="outline"
-                className="w-full mt-6 bg-transparent"
-                onClick={() => (user ? router.push("/app") : router.push("/auth/sign-up"))}
-              >
-                {user ? "Continue with Free" : "Start Free Trial"}
+              <Button className="w-full mt-6 bg-primary hover:bg-primary/90" onClick={() => handleUpgrade("monthly")}>
+                <Crown className="h-4 w-4 mr-2" />
+                Start Monthly Plan
               </Button>
             </CardContent>
           </Card>
 
-          {/* Pro Plan */}
+          {/* Yearly Plan */}
           <Card className="relative border-primary shadow-lg">
             <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground">
               Most Popular
@@ -169,24 +100,18 @@ export function PricingPage({ user }: PricingPageProps) {
             <CardHeader>
               <CardTitle className="text-2xl flex items-center gap-2">
                 <Crown className="h-6 w-6 text-primary" />
-                Pro Plan
+                Yearly Plan
               </CardTitle>
-              <CardDescription>
-                {billingCycle === "monthly"
-                  ? "Billed monthly or save with annual plan"
-                  : "Billed annually - save $45 per year"}
-              </CardDescription>
+              <CardDescription>Best value - save $45 per year</CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold">${billingCycle === "monthly" ? "12" : "99"}</span>
-                <span className="text-muted-foreground">/{billingCycle === "monthly" ? "month" : "year"}</span>
-                {billingCycle === "annual" && (
-                  <div className="text-sm text-muted-foreground mt-1">$8.25/month when billed annually</div>
-                )}
+                <span className="text-4xl font-bold">$99</span>
+                <span className="text-muted-foreground">/year</span>
+                <div className="text-sm text-green-600 font-medium mt-1">$8.25/month - Save $45!</div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <ul className="space-y-3">
-                {features.premium.map((feature, index) => (
+                {features.map((feature, index) => (
                   <li key={index} className="flex items-center gap-3">
                     <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
                     <span className="text-sm">{feature}</span>
@@ -194,20 +119,10 @@ export function PricingPage({ user }: PricingPageProps) {
                 ))}
               </ul>
 
-              <Button
-                className="w-full mt-6 bg-primary hover:bg-primary/90"
-                onClick={() => handleUpgrade(billingCycle)}
-                disabled={!user}
-              >
+              <Button className="w-full mt-6 bg-primary hover:bg-primary/90" onClick={() => handleUpgrade("annual")}>
                 <Crown className="h-4 w-4 mr-2" />
-                {user ? "Start Pro Trial" : "Sign In to Subscribe"}
+                Start Yearly Plan
               </Button>
-
-              {!user && (
-                <p className="text-xs text-muted-foreground text-center mt-2">
-                  Please sign in to subscribe to Pro plan
-                </p>
-              )}
             </CardContent>
           </Card>
         </div>
@@ -217,27 +132,27 @@ export function PricingPage({ user }: PricingPageProps) {
           <h2 className="text-2xl font-bold mb-8">Frequently Asked Questions</h2>
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto text-left">
             <div>
-              <h3 className="font-semibold mb-2">Can I change plans anytime?</h3>
+              <h3 className="font-semibold mb-2">What happens after I pay?</h3>
               <p className="text-sm text-muted-foreground">
-                Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">Is there a free trial?</h3>
-              <p className="text-sm text-muted-foreground">
-                Yes! The free plan is available forever with core features. Pro plan includes a trial period.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">What payment methods do you accept?</h3>
-              <p className="text-sm text-muted-foreground">
-                We accept all major credit cards, PayPal, and other secure payment methods via Lemon Squeezy.
+                After successful payment, you'll be redirected to create your account and access the full app.
               </p>
             </div>
             <div>
               <h3 className="font-semibold mb-2">Can I cancel anytime?</h3>
               <p className="text-sm text-muted-foreground">
-                Absolutely. You can cancel your subscription at any time with no cancellation fees.
+                Yes, you can cancel your subscription at any time. You'll receive a notification in the app.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">What payment methods do you accept?</h3>
+              <p className="text-sm text-muted-foreground">
+                We accept all major credit cards and secure payment methods via Lemon Squeezy.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibeld mb-2">Is my data secure?</h3>
+              <p className="text-sm text-muted-foreground">
+                Absolutely. All your financial data is encrypted and stored securely with enterprise-grade security.
               </p>
             </div>
           </div>
