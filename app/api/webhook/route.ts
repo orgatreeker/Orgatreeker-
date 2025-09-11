@@ -53,11 +53,34 @@ export async function POST(request: NextRequest) {
 
 async function handleSubscriptionEvent(event: any, supabase: any) {
   const subscription = event.data
-  const customData = subscription.attributes.custom_data || {}
-  const userEmail = customData.user_email || subscription.attributes.user_email
+  console.log("[v0] Processing subscription event:", JSON.stringify(subscription, null, 2))
+
+  let userEmail = null
+
+  // Try custom data first
+  if (subscription.attributes.custom_data?.user_email) {
+    userEmail = subscription.attributes.custom_data.user_email
+  }
+  // Try user_email field
+  else if (subscription.attributes.user_email) {
+    userEmail = subscription.attributes.user_email
+  }
+  // Try getting from customer data if available
+  else if (event.included) {
+    const customer = event.included.find((item: any) => item.type === "customers")
+    if (customer?.attributes?.email) {
+      userEmail = customer.attributes.email
+    }
+  }
+
+  console.log("[v0] Extracted user email:", userEmail)
 
   if (!userEmail) {
-    console.error("[v0] No user email found in subscription event")
+    console.error("[v0] No user email found in subscription event. Available data:", {
+      custom_data: subscription.attributes.custom_data,
+      user_email: subscription.attributes.user_email,
+      included: event.included?.map((item: any) => ({ type: item.type, email: item.attributes?.email })),
+    })
     return
   }
 
@@ -68,20 +91,30 @@ async function handleSubscriptionEvent(event: any, supabase: any) {
     .single()
 
   if (profileError || !profile) {
-    console.error("[v0] User not found for email:", userEmail)
+    console.error("[v0] User not found for email:", userEmail, "Error:", profileError)
     return
   }
 
   const variantId = subscription.attributes.variant_id
   let planType = "free"
 
-  if (variantId === 618060) {
-    // Monthly plan
+  if (variantId === 618060 || variantId === Number.parseInt(process.env.LEMONSQUEEZY_MONTHLY_VARIANT_ID || "618060")) {
     planType = "monthly"
-  } else if (variantId === 632299) {
-    // Annual plan
+  } else if (
+    variantId === 632299 ||
+    variantId === Number.parseInt(process.env.LEMONSQUEEZY_ANNUAL_VARIANT_ID || "632299")
+  ) {
     planType = "annual"
   }
+
+  console.log(
+    "[v0] Updating subscription for user:",
+    userEmail,
+    "Plan:",
+    planType,
+    "Status:",
+    subscription.attributes.status,
+  )
 
   const { error: updateError } = await supabase
     .from("profiles")
@@ -99,7 +132,12 @@ async function handleSubscriptionEvent(event: any, supabase: any) {
   if (updateError) {
     console.error("[v0] Error updating subscription:", updateError)
   } else {
-    console.log("[v0] Successfully updated subscription for user:", userEmail)
+    console.log(
+      "[v0] Successfully updated subscription for user:",
+      userEmail,
+      "New status:",
+      subscription.attributes.status,
+    )
   }
 }
 
@@ -131,8 +169,20 @@ async function handleSubscriptionCancellation(event: any, supabase: any) {
 
 async function handleOrderCreated(event: any, supabase: any) {
   const order = event.data
-  const customData = order.attributes.custom_data || {}
-  const userEmail = customData.user_email || order.attributes.user_email
+  console.log("[v0] Processing order event:", JSON.stringify(order, null, 2))
+
+  let userEmail = null
+
+  if (order.attributes.custom_data?.user_email) {
+    userEmail = order.attributes.custom_data.user_email
+  } else if (order.attributes.user_email) {
+    userEmail = order.attributes.user_email
+  } else if (event.included) {
+    const customer = event.included.find((item: any) => item.type === "customers")
+    if (customer?.attributes?.email) {
+      userEmail = customer.attributes.email
+    }
+  }
 
   console.log("[v0] Order created for user:", userEmail)
 
@@ -147,6 +197,8 @@ async function handleOrderCreated(event: any, supabase: any) {
 
     if (logError) {
       console.error("[v0] Error logging payment:", logError)
+    } else {
+      console.log("[v0] Successfully logged payment for user:", userEmail)
     }
   }
 }

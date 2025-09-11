@@ -74,8 +74,15 @@ export default function MainAppPage() {
           const isUserPremium =
             fetchedProfile.subscription_status === "active" &&
             (fetchedProfile.subscription_plan === "monthly" || fetchedProfile.subscription_plan === "annual")
+
+          console.log("[v0] Premium status check:", {
+            subscription_status: fetchedProfile.subscription_status,
+            subscription_plan: fetchedProfile.subscription_plan,
+            isPremium: isUserPremium,
+            user_email: fetchedProfile.email,
+          })
+
           setIsPremium(isUserPremium)
-          console.log("[v0] User premium status:", isUserPremium, "Plan:", fetchedProfile.subscription_plan)
         }
 
         setUser(session.user)

@@ -21,7 +21,13 @@ export function PricingPage({ user }: PricingPageProps) {
   }
 
   const handleUpgrade = (plan: "monthly" | "annual") => {
-    window.open(checkoutUrls[plan], "_blank")
+    const baseUrl = checkoutUrls[plan]
+    const checkoutUrl = user?.email
+      ? `${baseUrl}?checkout[custom][user_email]=${encodeURIComponent(user.email)}&checkout[email]=${encodeURIComponent(user.email)}`
+      : baseUrl
+
+    console.log("[v0] Opening checkout with URL:", checkoutUrl)
+    window.open(checkoutUrl, "_blank")
   }
 
   const features = {
