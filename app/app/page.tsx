@@ -24,6 +24,8 @@ export default function MainAppPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        console.log("[v0] Checking authentication...")
+
         const {
           data: { session },
           error,
@@ -31,13 +33,13 @@ export default function MainAppPage() {
 
         if (error) {
           console.error("[v0] Auth error:", error)
-          router.replace("/auth/login")
+          router.push("/auth/login")
           return
         }
 
         if (!session) {
           console.log("[v0] No session found, redirecting to login")
-          router.replace("/auth/login")
+          router.push("/auth/login")
           return
         }
 
@@ -106,9 +108,9 @@ export default function MainAppPage() {
           console.error("[v0] Profile error:", profileError)
 
           const fallbackProfile = {
-            id: user.id,
-            email: user.email,
-            full_name: user.user_metadata?.full_name || "",
+            id: session.user.id,
+            email: session.user.email,
+            full_name: session.user.user_metadata?.full_name || "",
             subscription_status: "free",
             subscription_plan: "free",
             onboarding_completed: false,
@@ -119,41 +121,13 @@ export default function MainAppPage() {
         }
       } catch (error) {
         console.error("[v0] Error checking auth:", error)
-        router.replace("/auth/login")
+        router.push("/auth/login")
       } finally {
         setIsLoading(false)
       }
     }
 
     checkAuth()
-
-    const channel = supabase
-      .channel("profile-subscription-updates")
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "profiles",
-        },
-        (payload) => {
-          console.log("[v0] Profile subscription updated:", payload.new)
-          if (payload.new && user && payload.new.id === user.id) {
-            setProfile(payload.new)
-            const isUserPremium =
-              payload.new.subscription_status === "active" &&
-              (payload.new.subscription_plan === "monthly" || payload.new.subscription_plan === "yearly")
-            setIsPremium(isUserPremium)
-
-            if (isUserPremium) {
-              console.log("[v0] 🎉 SUBSCRIPTION ACTIVATED! Premium features unlocked!")
-            } else {
-              console.log("[v0] ⚠️ Subscription status changed to free")
-            }
-          }
-        },
-      )
-      .subscribe()
 
     const {
       data: { subscription },
@@ -166,20 +140,16 @@ export default function MainAppPage() {
         setUser(null)
         setProfile(null)
         setIsPremium(false)
-        router.replace("/")
+        router.push("/")
       } else if (event === "SIGNED_IN" && session) {
-        console.log("[v0] User signed in, setting authenticated state")
-        setUser(session.user)
-        setIsAuthenticated(true)
-        // Don't reload the page, just update state
+        console.log("[v0] User signed in, refreshing profile")
+        // Refresh the page to reload profile data
+        window.location.reload()
       }
     })
 
-    return () => {
-      subscription.unsubscribe()
-      supabase.removeChannel(channel)
-    }
-  }, [router, supabase.auth]) // Removed user?.id from the dependency array
+    return () => subscription.unsubscribe()
+  }, [router, supabase.auth])
 
   if (isLoading) {
     return (
