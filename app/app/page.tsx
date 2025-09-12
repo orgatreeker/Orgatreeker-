@@ -17,29 +17,33 @@ export default function MainAppPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<any>(null)
-  const [isPremium, setIsPremium] = useState(false) // Default to false, check from database
+  const [isPremium, setIsPremium] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        console.log("[v0] Checking authentication...")
+
         const {
           data: { session },
           error,
         } = await supabase.auth.getSession()
 
         if (error) {
-          console.error("Auth error:", error)
-          router.push("/pricing") // Redirect to pricing instead of login
+          console.error("[v0] Auth error:", error)
+          router.push("/auth/login")
           return
         }
 
         if (!session) {
-          router.push("/pricing") // Redirect to pricing instead of login
+          console.log("[v0] No session found, redirecting to login")
+          router.push("/auth/login")
           return
         }
 
+        console.log("[v0] User authenticated:", session.user.email)
         setUser(session.user)
         setIsAuthenticated(true)
 
@@ -51,14 +55,16 @@ export default function MainAppPage() {
             .single()
 
           if (profileError && profileError.code === "PGRST116") {
+            console.log("[v0] Creating new profile for user:", session.user.email)
+
             const { data: newProfile, error: insertError } = await supabase
               .from("profiles")
               .insert({
                 id: session.user.id,
                 email: session.user.email,
                 full_name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || "",
-                subscription_status: "free", // Default to free instead of active
-                subscription_plan: "free", // Default to free instead of pro
+                subscription_status: "free",
+                subscription_plan: "free",
                 onboarding_completed: false,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
@@ -67,28 +73,40 @@ export default function MainAppPage() {
               .single()
 
             if (insertError) {
-              console.error("Error creating profile:", insertError)
+              console.error("[v0] Error creating profile:", insertError)
               throw insertError
             }
 
             fetchedProfile = newProfile
+            console.log("[v0] Successfully created new profile")
           }
 
           if (fetchedProfile) {
             setProfile(fetchedProfile)
-            const isActiveSubscription =
+
+            const isUserPremium =
               fetchedProfile.subscription_status === "active" &&
               (fetchedProfile.subscription_plan === "monthly" || fetchedProfile.subscription_plan === "yearly")
-            setIsPremium(isActiveSubscription)
 
-            console.log("[v0] Subscription status:", {
-              status: fetchedProfile.subscription_status,
-              plan: fetchedProfile.subscription_plan,
-              isPremium: isActiveSubscription,
+            console.log("[v0] Premium status check:", {
+              user_email: fetchedProfile.email,
+              subscription_status: fetchedProfile.subscription_status,
+              subscription_plan: fetchedProfile.subscription_plan,
+              isPremium: isUserPremium,
+              subscription_updated_at: fetchedProfile.subscription_updated_at,
             })
+
+            setIsPremium(isUserPremium)
+
+            if (isUserPremium) {
+              console.log("[v0] ✅ User has PREMIUM access - all features unlocked!")
+            } else {
+              console.log("[v0] ⚠️ User has FREE access - some features locked")
+            }
           }
         } catch (profileError) {
-          console.error("Profile error:", profileError)
+          console.error("[v0] Profile error:", profileError)
+
           const fallbackProfile = {
             id: session.user.id,
             email: session.user.email,
@@ -98,11 +116,12 @@ export default function MainAppPage() {
             onboarding_completed: false,
           }
           setProfile(fallbackProfile)
-          setIsPremium(false) // Set to false for fallback
+          setIsPremium(false)
+          console.log("[v0] Using fallback profile with free access")
         }
       } catch (error) {
-        console.error("Error checking auth:", error)
-        router.push("/pricing") // Redirect to pricing instead of login
+        console.error("[v0] Error checking auth:", error)
+        router.push("/auth/login")
       } finally {
         setIsLoading(false)
       }
@@ -110,46 +129,43 @@ export default function MainAppPage() {
 
     checkAuth()
 
-    const subscriptionChannel = supabase
-      .channel("subscription-updates")
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "profiles",
-          filter: `id=eq.${user?.id}`,
-        },
-        (payload) => {
-          console.log("[v0] Subscription updated:", payload.new)
-          setProfile(payload.new)
-          const isActiveSubscription =
-            payload.new.subscription_status === "active" &&
-            (payload.new.subscription_plan === "monthly" || payload.new.subscription_plan === "yearly")
-          setIsPremium(isActiveSubscription)
-        },
-      )
-      .subscribe()
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("[v0] Auth state changed:", event)
+
       if (event === "SIGNED_OUT" || !session) {
+        console.log("[v0] User signed out, clearing state")
         setIsAuthenticated(false)
         setUser(null)
         setProfile(null)
         setIsPremium(false)
-        router.push("/pricing") // Redirect to pricing instead of home
+        router.push("/")
       } else if (event === "SIGNED_IN" && session) {
+        console.log("[v0] User signed in, refreshing profile")
+        // Refresh the page to reload profile data
         window.location.reload()
       }
     })
 
-    return () => {
-      subscription.unsubscribe()
-      subscriptionChannel.unsubscribe() // Cleanup subscription channel
-    }
-  }, [router, supabase.auth, user?.id])
+    return () => subscription.unsubscribe()
+  }, [router, supabase.auth])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground text-sm md:text-base">Loading your dashboard...</p>
+          <p className="text-xs text-muted-foreground mt-2">Checking subscription status...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null // Will redirect to login
+  }
 
   const renderContent = () => {
     switch (activeTab) {
@@ -170,21 +186,6 @@ export default function MainAppPage() {
       default:
         return <DashboardPage isPremium={isPremium} />
     }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground text-sm md:text-base">Loading your dashboard...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return null // Will redirect to pricing
   }
 
   return (

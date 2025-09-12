@@ -1,19 +1,19 @@
 "use client"
 
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Check, Crown, Star, Copy } from "lucide-react"
+import { Check, X, Crown, ArrowLeft } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
 
 interface PricingPageProps {
   user?: any
 }
 
 export function PricingPage({ user }: PricingPageProps) {
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly")
   const router = useRouter()
-  const [copied, setCopied] = useState(false)
 
   const checkoutUrls = {
     monthly: "https://orgatreeker.lemonsqueezy.com/buy/0a307afb-5bfd-4b83-9219-1e144302c550",
@@ -23,158 +23,191 @@ export function PricingPage({ user }: PricingPageProps) {
   const handleUpgrade = (plan: "monthly" | "annual") => {
     const baseUrl = checkoutUrls[plan]
 
-    const params = new URLSearchParams()
-    params.set("checkout[custom][redirect_url]", `${window.location.origin}/auth`)
+    let checkoutUrl = baseUrl
 
-    const checkoutUrl = `${baseUrl}?${params.toString()}`
-    window.location.href = checkoutUrl
-  }
+    if (user?.email) {
+      const params = new URLSearchParams()
+      params.set("checkout[custom][user_email]", user.email)
+      params.set("checkout[email]", user.email)
+      params.set("checkout[name]", user.user_metadata?.full_name || user.email.split("@")[0])
 
-  const handleCopyCoupon = async () => {
-    try {
-      await navigator.clipboard.writeText("GREAT50OFF")
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error("Failed to copy coupon code:", err)
+      checkoutUrl = `${baseUrl}?${params.toString()}`
     }
+
+    console.log("[v0] Opening checkout with URL:", checkoutUrl)
+    console.log("[v0] User data being passed:", {
+      email: user?.email,
+      name: user?.user_metadata?.full_name,
+      plan: plan,
+    })
+
+    window.open(checkoutUrl, "_blank")
   }
 
-  const features = [
-    "Unlimited income sources",
-    "Advanced insights & analytics",
-    "Full savings breakdown (50/30/20 or custom)",
-    "Detailed subcategory tracking",
-    "Multi-month financial history",
-    "Priority email support",
-    "Export data to CSV/Excel",
-    "Multi-currency support",
-    "Customizable budgeting percentages",
-    "Real-time dashboard updates",
-  ]
+  const features = {
+    free: [
+      "Track income from up to 5 sources",
+      "Dashboard with basic insights",
+      "Manual expense tracking",
+      "Customizable budgeting percentages",
+      "Multi-currency support",
+    ],
+    premium: [
+      "Everything in Free Plan",
+      "Unlimited income sources",
+      "Advanced insights & analytics",
+      "Full savings breakdown (50/30/20 or custom)",
+      "Detailed subcategory tracking",
+      "Multi-month financial history",
+      "Priority email support",
+      "Export data to CSV/Excel",
+    ],
+  }
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-950">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b border-neutral-200 dark:border-neutral-800">
+      <div className="border-b">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Crown className="h-6 w-6 text-neutral-950 dark:text-neutral-50" />
-            <span className="text-xl font-bold font-sans text-neutral-950 dark:text-neutral-50">Orgatreeker</span>
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="sm" onClick={() => (user ? router.push("/app") : router.push("/"))}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              {user ? "Back to App" : "Back to Home"}
+            </Button>
+            <div className="flex items-center gap-2">
+              <Crown className="h-6 w-6 text-primary" />
+              <span className="text-xl font-bold">Orgatreeker</span>
+            </div>
           </div>
+          {user && <Badge variant="secondary">Signed in as {user.email}</Badge>}
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-16 max-w-6xl">
         {/* Hero Section */}
         <div className="text-center mb-16">
-          <h1 className="text-4xl md:text-5xl font-bold font-sans tracking-tight mb-4 text-neutral-950 dark:text-neutral-50 text-balance">
-            Simple, Transparent Pricing
-          </h1>
-          <p className="text-xl text-neutral-600 dark:text-neutral-400 mb-8 text-pretty">
-            Choose the plan that works best for you
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">Simple, Transparent Pricing</h1>
+          <p className="text-xl text-muted-foreground mb-8">
+            Start free and upgrade when you're ready for advanced features
           </p>
+
+          {/* Billing Toggle */}
+          <div className="flex items-center justify-center gap-4 mb-8">
+            <Button
+              variant={billingCycle === "monthly" ? "default" : "outline"}
+              onClick={() => setBillingCycle("monthly")}
+              className="px-6"
+            >
+              Monthly
+            </Button>
+            <Button
+              variant={billingCycle === "annual" ? "default" : "outline"}
+              onClick={() => setBillingCycle("annual")}
+              className="px-6 relative"
+            >
+              Annual
+              <Badge className="absolute -top-2 -right-2 bg-green-500 text-white text-xs">Save $45</Badge>
+            </Button>
+          </div>
         </div>
 
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-          {/* Monthly Plan */}
-          <Card className="relative bg-card border-neutral-200 dark:border-neutral-800 shadow-sm rounded-xl">
-            <CardHeader className="py-6 px-6">
-              <CardTitle className="text-2xl font-semibold font-sans flex items-center gap-2 text-card-foreground">
-                <Crown className="h-6 w-6 text-neutral-950 dark:text-neutral-50" />
-                Monthly Plan
-              </CardTitle>
-              <CardDescription className="text-sm text-muted-foreground">Perfect for getting started</CardDescription>
+          {/* Free Plan */}
+          <Card className="relative">
+            <CardHeader>
+              <CardTitle className="text-2xl">Free Plan</CardTitle>
+              <CardDescription>Forever free</CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold font-mono text-neutral-950 dark:text-neutral-50">$12</span>
-                <span className="text-muted-foreground font-sans">/month</span>
+                <span className="text-4xl font-bold">$0</span>
+                <span className="text-muted-foreground">/month</span>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4 py-6 px-6">
+            <CardContent className="space-y-4">
               <ul className="space-y-3">
-                {features.map((feature, index) => (
+                {features.free.map((feature, index) => (
                   <li key={index} className="flex items-center gap-3">
-                    <Check className="h-5 w-5 text-green-600 flex-shrink-0" />
-                    <span className="text-sm font-sans text-card-foreground">{feature}</span>
+                    <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
+                    <span className="text-sm">{feature}</span>
                   </li>
                 ))}
               </ul>
 
+              {/* Limitations */}
+              <div className="pt-4 border-t">
+                <ul className="space-y-2">
+                  <li className="flex items-center gap-3 text-muted-foreground">
+                    <X className="h-4 w-4 text-red-500 flex-shrink-0" />
+                    <span className="text-sm">Advanced analytics & insights</span>
+                  </li>
+                  <li className="flex items-center gap-3 text-muted-foreground">
+                    <X className="h-4 w-4 text-red-500 flex-shrink-0" />
+                    <span className="text-sm">Unlimited income sources</span>
+                  </li>
+                  <li className="flex items-center gap-3 text-muted-foreground">
+                    <X className="h-4 w-4 text-red-500 flex-shrink-0" />
+                    <span className="text-sm">Detailed subcategory tracking</span>
+                  </li>
+                </ul>
+              </div>
+
               <Button
-                className="w-full mt-6 bg-neutral-950 hover:bg-neutral-800 text-neutral-50 font-sans font-medium"
-                onClick={() => handleUpgrade("monthly")}
+                variant="outline"
+                className="w-full mt-6 bg-transparent"
+                onClick={() => (user ? router.push("/app") : router.push("/auth/sign-up"))}
               >
-                <Crown className="h-4 w-4 mr-2" />
-                Start Monthly Plan
+                {user ? "Continue with Free" : "Start Free Trial"}
               </Button>
             </CardContent>
           </Card>
 
-          {/* Yearly Plan */}
-          <Card className="relative bg-card border-neutral-950 dark:border-neutral-50 shadow-lg rounded-xl">
-            <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-neutral-950 text-neutral-50 dark:bg-neutral-50 dark:text-neutral-950 font-sans font-medium">
+          {/* Pro Plan */}
+          <Card className="relative border-primary shadow-lg">
+            <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground">
               Most Popular
             </Badge>
-            <CardHeader className="py-6 px-6">
-              <CardTitle className="text-2xl font-semibold font-sans flex items-center gap-2 text-card-foreground">
-                <Crown className="h-6 w-6 text-neutral-950 dark:text-neutral-50" />
-                Yearly Plan
-                <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+            <CardHeader>
+              <CardTitle className="text-2xl flex items-center gap-2">
+                <Crown className="h-6 w-6 text-primary" />
+                Pro Plan
               </CardTitle>
-              <CardDescription className="text-sm text-muted-foreground">
-                Best value - save $45 per year
+              <CardDescription>
+                {billingCycle === "monthly"
+                  ? "Billed monthly or save with annual plan"
+                  : "Billed annually - save $45 per year"}
               </CardDescription>
               <div className="mt-4">
-                <span className="text-4xl font-bold font-mono text-neutral-950 dark:text-neutral-50">$99</span>
-                <span className="text-muted-foreground font-sans">/year</span>
-                <div className="text-sm text-green-600 font-medium font-sans mt-1">$8.25/month - Save $45!</div>
-              </div>
-
-              <div className="mt-4 p-3 bg-neutral-100 dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-sans text-muted-foreground mb-1">Special Offer Code:</p>
-                    <code
-                      className="text-sm font-mono font-bold text-neutral-950 dark:text-neutral-50 cursor-pointer hover:bg-neutral-200 dark:hover:bg-neutral-700 px-2 py-1 rounded transition-colors"
-                      onClick={handleCopyCoupon}
-                      onMouseEnter={() => {
-                        // Auto-copy on hover
-                        navigator.clipboard.writeText("GREAT50OFF").catch(() => {})
-                      }}
-                    >
-                      GREAT50OFF
-                    </code>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCopyCoupon}
-                    className="h-8 w-8 p-0 hover:bg-neutral-200 dark:hover:bg-neutral-700"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                {copied && <p className="text-xs text-green-600 font-sans mt-1">Copied to clipboard!</p>}
+                <span className="text-4xl font-bold">${billingCycle === "monthly" ? "12" : "99"}</span>
+                <span className="text-muted-foreground">/{billingCycle === "monthly" ? "month" : "year"}</span>
+                {billingCycle === "annual" && (
+                  <div className="text-sm text-muted-foreground mt-1">$8.25/month when billed annually</div>
+                )}
               </div>
             </CardHeader>
-            <CardContent className="space-y-4 py-6 px-6">
+            <CardContent className="space-y-4">
               <ul className="space-y-3">
-                {features.map((feature, index) => (
+                {features.premium.map((feature, index) => (
                   <li key={index} className="flex items-center gap-3">
-                    <Check className="h-5 w-5 text-green-600 flex-shrink-0" />
-                    <span className="text-sm font-sans text-card-foreground">{feature}</span>
+                    <Check className="h-5 w-5 text-green-500 flex-shrink-0" />
+                    <span className="text-sm">{feature}</span>
                   </li>
                 ))}
               </ul>
 
               <Button
-                className="w-full mt-6 bg-neutral-950 hover:bg-neutral-800 text-neutral-50 font-sans font-medium"
-                onClick={() => handleUpgrade("annual")}
+                className="w-full mt-6 bg-primary hover:bg-primary/90"
+                onClick={() => handleUpgrade(billingCycle)}
+                disabled={!user}
               >
                 <Crown className="h-4 w-4 mr-2" />
-                Start Yearly Plan
+                {user ? "Start Pro Trial" : "Sign In to Subscribe"}
               </Button>
+
+              {!user && (
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  Please sign in to subscribe to Pro plan
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -184,27 +217,27 @@ export function PricingPage({ user }: PricingPageProps) {
           <h2 className="text-2xl font-bold mb-8">Frequently Asked Questions</h2>
           <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto text-left">
             <div>
-              <h3 className="font-semibold mb-2">What happens after I pay?</h3>
+              <h3 className="font-semibold mb-2">Can I change plans anytime?</h3>
               <p className="text-sm text-muted-foreground">
-                After successful payment, you'll be redirected to create your account and access the full app.
+                Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately.
               </p>
             </div>
             <div>
-              <h3 className="font-semibold mb-2">Can I cancel anytime?</h3>
+              <h3 className="font-semibold mb-2">Is there a free trial?</h3>
               <p className="text-sm text-muted-foreground">
-                Yes, you can cancel your subscription at any time. You'll receive a notification in the app.
+                Yes! The free plan is available forever with core features. Pro plan includes a trial period.
               </p>
             </div>
             <div>
               <h3 className="font-semibold mb-2">What payment methods do you accept?</h3>
               <p className="text-sm text-muted-foreground">
-                We accept all major credit cards and secure payment methods via Lemon Squeezy.
+                We accept all major credit cards, PayPal, and other secure payment methods via Lemon Squeezy.
               </p>
             </div>
             <div>
-              <h3 className="font-semibold mb-2">Is my data secure?</h3>
+              <h3 className="font-semibold mb-2">Can I cancel anytime?</h3>
               <p className="text-sm text-muted-foreground">
-                Absolutely. All your financial data is encrypted and stored securely with enterprise-grade security.
+                Absolutely. You can cancel your subscription at any time with no cancellation fees.
               </p>
             </div>
           </div>

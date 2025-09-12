@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useState, useEffect } from "react"
-import { LogIn, CheckCircle } from "lucide-react"
+import { LogIn } from "lucide-react"
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
@@ -16,18 +16,12 @@ export default function LoginPage() {
   const [isGitHubLoading, setIsGitHubLoading] = useState(false)
   const searchParams = useSearchParams()
 
-  const paymentSuccess = searchParams.get("payment") === "success"
-
   useEffect(() => {
     const urlMessage = searchParams.get("message")
     if (urlMessage) {
       setMessage(urlMessage)
     }
-
-    if (paymentSuccess) {
-      setMessage("Payment successful! Please create your account to access the app.")
-    }
-  }, [searchParams, paymentSuccess])
+  }, [searchParams])
 
   const handleGoogleLogin = async () => {
     const supabase = createClient()
@@ -73,31 +67,13 @@ export default function LoginPage() {
     <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
       <div className="w-full max-w-sm">
         <div className="flex flex-col gap-6">
-          {paymentSuccess && (
-            <Card className="border-green-200 bg-green-50">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3 text-green-700">
-                  <CheckCircle className="h-5 w-5" />
-                  <div>
-                    <p className="font-medium">Payment Successful!</p>
-                    <p className="text-sm text-green-600">Create your account to access all premium features.</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
           <Card>
             <CardHeader>
               <CardTitle className="text-2xl flex items-center gap-2">
                 <LogIn className="h-6 w-6 text-blue-500" />
-                {paymentSuccess ? "Create Your Account" : "Welcome Back"}
+                Welcome Back
               </CardTitle>
-              <CardDescription>
-                {paymentSuccess
-                  ? "Complete your registration to access your premium account"
-                  : "Sign in to your account using your preferred method"}
-              </CardDescription>
+              <CardDescription>Sign in to your account using your preferred method</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-col gap-4">
@@ -154,7 +130,7 @@ export default function LoginPage() {
 
                 {message && (
                   <Alert>
-                    <AlertDescription className={paymentSuccess ? "text-green-600" : ""}>{message}</AlertDescription>
+                    <AlertDescription className="text-green-600">{message}</AlertDescription>
                   </Alert>
                 )}
 
@@ -165,18 +141,10 @@ export default function LoginPage() {
                 )}
 
                 <div className="text-center text-sm">
-                  {paymentSuccess ? (
-                    <p className="text-muted-foreground">
-                      Your subscription is ready. Sign in to activate your premium account.
-                    </p>
-                  ) : (
-                    <>
-                      New to our platform?{" "}
-                      <Link href="/pricing" className="underline underline-offset-4">
-                        Get started
-                      </Link>
-                    </>
-                  )}
+                  New to our platform?{" "}
+                  <Link href="/auth/sign-up" className="underline underline-offset-4">
+                    Get started
+                  </Link>
                 </div>
               </div>
             </CardContent>

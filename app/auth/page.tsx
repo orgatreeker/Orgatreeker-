@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { useState, useEffect } from "react"
-import { LogIn, UserPlus, DollarSign, CheckCircle } from "lucide-react"
+import { LogIn, UserPlus, DollarSign } from "lucide-react"
 
 export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "signup">("login")
@@ -17,19 +17,12 @@ export default function AuthPage() {
   const [isGitHubLoading, setIsGitHubLoading] = useState(false)
   const searchParams = useSearchParams()
 
-  const paymentSuccess = searchParams.get("payment") === "success"
-
   useEffect(() => {
     const urlMessage = searchParams.get("message")
     if (urlMessage) {
       setMessage(urlMessage)
     }
-
-    if (paymentSuccess) {
-      setMode("signup")
-      setMessage("Payment successful! Please create your account to access all premium features.")
-    }
-  }, [searchParams, paymentSuccess])
+  }, [searchParams])
 
   const handleGoogleAuth = async () => {
     const supabase = createClient()
@@ -89,43 +82,25 @@ export default function AuthPage() {
       <div className="flex min-h-[calc(100vh-80px)] w-full items-center justify-center p-6 md:p-10">
         <div className="w-full max-w-sm">
           <div className="flex flex-col gap-6">
-            {paymentSuccess && (
-              <Card className="border-green-200 bg-green-50">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3 text-green-700">
-                    <CheckCircle className="h-5 w-5" />
-                    <div>
-                      <p className="font-medium">Payment Successful!</p>
-                      <p className="text-sm text-green-600">Create your account to access all premium features.</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
             <Card>
               <CardHeader>
                 <CardTitle className="text-2xl flex items-center gap-2">
                   {mode === "login" ? (
                     <>
                       <LogIn className="h-6 w-6 text-blue-500" />
-                      {paymentSuccess ? "Create Your Account" : "Welcome Back"}
+                      Welcome Back
                     </>
                   ) : (
                     <>
                       <UserPlus className="h-6 w-6 text-blue-500" />
-                      {paymentSuccess ? "Complete Your Registration" : "Get Started"}
+                      Get Started
                     </>
                   )}
                 </CardTitle>
                 <CardDescription>
                   {mode === "login"
-                    ? paymentSuccess
-                      ? "Complete your registration to access your premium account"
-                      : "Sign in to your account using your preferred method"
-                    : paymentSuccess
-                      ? "Your subscription is ready. Create your account to get started."
-                      : "Create your account using your preferred method"}
+                    ? "Sign in to your account using your preferred method"
+                    : "Create your account using your preferred method"}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -183,7 +158,7 @@ export default function AuthPage() {
 
                   {message && (
                     <Alert>
-                      <AlertDescription className={paymentSuccess ? "text-green-600" : ""}>{message}</AlertDescription>
+                      <AlertDescription className="text-green-600">{message}</AlertDescription>
                     </Alert>
                   )}
 
@@ -194,11 +169,7 @@ export default function AuthPage() {
                   )}
 
                   <div className="text-center text-sm">
-                    {paymentSuccess ? (
-                      <p className="text-muted-foreground">
-                        Your subscription is ready. Sign in to activate your premium account.
-                      </p>
-                    ) : mode === "login" ? (
+                    {mode === "login" ? (
                       <>
                         New to our platform?{" "}
                         <button
