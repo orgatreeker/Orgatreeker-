@@ -13,19 +13,16 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Badge } from "@/components/ui/badge"
-import { User, CreditCard, Menu, Settings, Crown } from "lucide-react"
+import { User, CreditCard, Menu } from "lucide-react"
 import { LogoutButton } from "@/components/logout-button"
 import { getProfile, createProfile, type Profile } from "@/lib/profile-utils"
 
 interface NavigationProps {
   activeTab: string
   onTabChange: (tab: string) => void
-  isPremium?: boolean
-  profile?: any
 }
 
-export function Navigation({ activeTab, onTabChange, isPremium = false, profile: passedProfile }: NavigationProps) {
+export function Navigation({ activeTab, onTabChange }: NavigationProps) {
   const [user, setUser] = useState<any>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -46,9 +43,7 @@ export function Navigation({ activeTab, onTabChange, isPremium = false, profile:
 
         setUser(user)
 
-        if (passedProfile) {
-          setProfile(passedProfile)
-        } else if (user) {
+        if (user) {
           let profileData = await getProfile(user.id)
 
           if (!profileData) {
@@ -94,7 +89,7 @@ export function Navigation({ activeTab, onTabChange, isPremium = false, profile:
     })
 
     return () => subscription.unsubscribe()
-  }, [supabase.auth, passedProfile])
+  }, [supabase.auth])
 
   const getUserInitials = () => {
     if (!user) return "U"
@@ -116,18 +111,6 @@ export function Navigation({ activeTab, onTabChange, isPremium = false, profile:
     setIsMobileMenuOpen(false) // Close mobile menu when tab changes
   }
 
-  const handleProfileNavigation = () => {
-    onTabChange("profile")
-  }
-
-  const handleAccountNavigation = () => {
-    onTabChange("account")
-  }
-
-  const handleBillingNavigation = () => {
-    onTabChange("billing")
-  }
-
   const navigationItems = [
     { value: "dashboard", label: "Dashboard" },
     { value: "income", label: "Income" },
@@ -145,15 +128,6 @@ export function Navigation({ activeTab, onTabChange, isPremium = false, profile:
           </div>
           <span className="font-semibold text-base md:text-lg hidden sm:block">FinanceTracker</span>
           <span className="font-semibold text-base md:text-lg sm:hidden">FT</span>
-          {isPremium && (
-            <Badge
-              variant="secondary"
-              className="hidden sm:flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white"
-            >
-              <Crown className="h-3 w-3" />
-              Pro
-            </Badge>
-          )}
         </div>
 
         {/* Desktop Navigation Tabs - Hidden on mobile */}
@@ -185,15 +159,6 @@ export function Navigation({ activeTab, onTabChange, isPremium = false, profile:
                     <span className="text-primary-foreground font-bold text-sm">FT</span>
                   </div>
                   <span className="font-semibold text-lg">FinanceTracker</span>
-                  {isPremium && (
-                    <Badge
-                      variant="secondary"
-                      className="flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white"
-                    >
-                      <Crown className="h-3 w-3" />
-                      Pro
-                    </Badge>
-                  )}
                 </div>
 
                 {/* Mobile Navigation Items */}
@@ -223,18 +188,6 @@ export function Navigation({ activeTab, onTabChange, isPremium = false, profile:
                         <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                       </div>
                     </div>
-                    <Button variant="ghost" className="w-full justify-start" onClick={handleProfileNavigation}>
-                      <User className="mr-2 h-4 w-4" />
-                      Profile Settings
-                    </Button>
-                    <Button variant="ghost" className="w-full justify-start" onClick={handleAccountNavigation}>
-                      <Settings className="mr-2 h-4 w-4" />
-                      Account Settings
-                    </Button>
-                    <Button variant="ghost" className="w-full justify-start" onClick={handleBillingNavigation}>
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Billing Settings
-                    </Button>
                     <LogoutButton className="w-full justify-start text-destructive" />
                   </div>
                 )}
@@ -247,88 +200,33 @@ export function Navigation({ activeTab, onTabChange, isPremium = false, profile:
         <div className="hidden md:block">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="relative h-8 w-8 md:h-10 md:w-10 rounded-full hover:bg-accent transition-colors"
-                onClick={() => console.log("[v0] Profile dropdown clicked")}
-              >
+              <Button variant="ghost" className="relative h-8 w-8 md:h-10 md:w-10 rounded-full">
                 <Avatar className="h-8 w-8 md:h-10 md:w-10">
                   <AvatarImage src="/placeholder.svg?height=40&width=40" alt="Profile" />
-                  <AvatarFallback className="text-xs md:text-sm bg-primary text-primary-foreground">
-                    {getUserInitials()}
-                  </AvatarFallback>
+                  <AvatarFallback className="text-xs md:text-sm">{getUserInitials()}</AvatarFallback>
                 </Avatar>
-                {isPremium && (
-                  <div className="absolute -top-1 -right-1 h-4 w-4 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full flex items-center justify-center">
-                    <Crown className="h-2.5 w-2.5 text-white" />
-                  </div>
-                )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent
-              className="w-56 bg-popover border border-border shadow-lg rounded-lg z-[100] p-1"
-              align="end"
-              forceMount
-              sideOffset={8}
-              side="bottom"
-            >
+            <DropdownMenuContent className="w-56" align="end" forceMount>
               {user && (
                 <>
-                  <div className="flex flex-col space-y-1 p-3 bg-muted/50 rounded-md mx-1 mb-1">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium leading-none text-foreground">{getUserDisplayName()}</p>
-                      {isPremium && (
-                        <Badge
-                          variant="secondary"
-                          className="text-xs bg-gradient-to-r from-amber-500 to-orange-500 text-white"
-                        >
-                          <Crown className="h-3 w-3 mr-1" />
-                          Pro
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-xs leading-none text-muted-foreground truncate">{user.email}</p>
+                  <div className="flex flex-col space-y-1 p-2">
+                    <p className="text-sm font-medium leading-none">{getUserDisplayName()}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                   </div>
-                  <DropdownMenuSeparator className="my-1" />
+                  <DropdownMenuSeparator />
                 </>
               )}
-              <DropdownMenuItem
-                onClick={() => {
-                  console.log("[v0] Profile Settings clicked")
-                  handleProfileNavigation()
-                }}
-                className="cursor-pointer hover:bg-accent focus:bg-accent rounded-md mx-1 my-0.5 flex items-center gap-2 p-2"
-              >
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Profile Settings</span>
+              <DropdownMenuItem>
+                <User className="mr-2 h-4 w-4" />
+                <span>Account</span>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  console.log("[v0] Account Settings clicked")
-                  handleAccountNavigation()
-                }}
-                className="cursor-pointer hover:bg-accent focus:bg-accent rounded-md mx-1 my-0.5 flex items-center gap-2 p-2"
-              >
-                <Settings className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Account Settings</span>
+              <DropdownMenuItem>
+                <CreditCard className="mr-2 h-4 w-4" />
+                <span>Billing</span>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  console.log("[v0] Billing Settings clicked")
-                  handleBillingNavigation()
-                }}
-                className="cursor-pointer hover:bg-accent focus:bg-accent rounded-md mx-1 my-0.5 flex items-center gap-2 p-2"
-              >
-                <CreditCard className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Billing Settings</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="my-1" />
-              <div className="mx-1 my-0.5">
-                <LogoutButton
-                  variant="dropdown"
-                  className="w-full justify-start hover:bg-destructive/10 hover:text-destructive rounded-md"
-                />
-              </div>
+              <DropdownMenuSeparator />
+              <LogoutButton variant="dropdown" />
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

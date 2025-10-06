@@ -23,7 +23,6 @@ import {
 import { useRouter } from "next/navigation"
 import { useDateContext } from "@/contexts/date-context"
 import { useCurrency } from "@/contexts/currency-context"
-import { useBudgetSplit } from "@/hooks/use-budget-split"
 
 interface IncomeSource {
   id: string
@@ -77,7 +76,6 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
   const router = useRouter()
   const { selectedDate, selectedYear, selectedMonthNumber } = useDateContext()
   const { formatAmount } = useCurrency()
-  const { budgetSplit, isLoading: budgetSplitLoading } = useBudgetSplit()
 
   const supabase = createClient()
 
@@ -296,21 +294,18 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
       name: "Needs",
       value: totalSpent > 0 ? Math.round(((expensesByType.Needs || 0) / totalSpent) * 100) : 0,
       amount: expensesByType.Needs || 0,
-      target: budgetSplit.needs_percentage,
       color: "#8b5cf6", // Purple-500
     },
     {
       name: "Wants",
       value: totalSpent > 0 ? Math.round(((expensesByType.Wants || 0) / totalSpent) * 100) : 0,
       amount: expensesByType.Wants || 0,
-      target: budgetSplit.wants_percentage,
       color: "#06b6d4", // Cyan-500
     },
     {
       name: "Savings",
       value: totalSpent > 0 ? Math.round(((expensesByType.Savings || 0) / totalSpent) * 100) : 0,
       amount: expensesByType.Savings || 0,
-      target: budgetSplit.savings_percentage,
       color: "#10b981", // Emerald-500
     },
   ]
@@ -331,7 +326,7 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
     }
   })
 
-  if (isLoading || budgetSplitLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -401,7 +396,9 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Growth</CardTitle>
-            {growthPercentage > 0 ? (
+            {!isPremium ? (
+              <Lock className="h-4 w-4 text-muted-foreground" />
+            ) : growthPercentage > 0 ? (
               <TrendingUp className="h-4 w-4 text-green-600" />
             ) : (
               <TrendingDown className="h-4 w-4 text-red-600" />
@@ -411,12 +408,7 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
             {!isPremium ? (
               <div className="space-y-2">
                 <div className="text-2xl font-bold text-muted-foreground">--</div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-xs h-6 bg-transparent"
-                  onClick={() => router.push("/")}
-                >
+                <Button size="sm" variant="outline" className="text-xs h-6 bg-transparent">
                   <Crown className="w-3 h-3 mr-1" />
                   Upgrade to Pro
                 </Button>
@@ -504,7 +496,7 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
                 <div className="text-center space-y-2">
                   <p className="text-sm font-medium">Advanced Analytics Locked</p>
                   <p className="text-xs text-muted-foreground">Upgrade to Pro to see detailed expense breakdowns</p>
-                  <Button size="sm" className="mt-2" onClick={() => router.push("/")}>
+                  <Button size="sm" className="mt-2">
                     <Crown className="w-3 h-3 mr-1" />
                     Upgrade to Pro
                   </Button>
@@ -552,7 +544,7 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
                           style={{ backgroundColor: entry.color }}
                         />
                         <span className="text-sm font-medium">
-                          {entry.name}: {formatCurrency(entry.amount)} ({entry.value}% vs {entry.target}% target)
+                          {entry.name}: {formatCurrency(entry.amount)}
                         </span>
                       </div>
                     ))}

@@ -1,211 +1,127 @@
 "use client"
 
-import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useSearchParams, useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
-import { LogIn, UserPlus, DollarSign } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
+import { Navigation } from "@/components/navigation"
+import { DashboardPage } from "@/components/dashboard-page"
+import { IncomePage } from "@/components/income-page"
+import { BudgetPage } from "@/components/budget-page"
+import { SettingsPage } from "@/components/settings-page"
 
-export default function AuthPage() {
-  const [mode, setMode] = useState<"login" | "signup">("login")
-  const [error, setError] = useState<string | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
-  const [isGitHubLoading, setIsGitHubLoading] = useState(false)
-  const searchParams = useSearchParams()
+export default function AppPage() {
+  const [activeTab, setActiveTab] = useState("dashboard")
+  const [isLoading, setIsLoading] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [user, setUser] = useState<any>(null)
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
     const checkAuth = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      try {
+        const {
+          data: { session },
+          error,
+        } = await supabase.auth.getSession()
 
-      if (session) {
-        router.push("/app")
-        return
+        if (error) {
+          console.error("Auth error:", error)
+          router.push("/auth")
+          return
+        }
+
+        if (!session) {
+          router.push("/auth")
+          return
+        }
+
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", session.user.id)
+          .single()
+
+        if (profileError && profileError.code === "PGRST116") {
+          const { error: insertError } = await supabase.from("profiles").insert({
+            id: session.user.id,
+            email: session.user.email,
+            full_name:
+              session.user.user_metadata?.full_name ||
+              session.user.user_metadata?.name ||
+              `${session.user.user_metadata?.first_name || ""} ${session.user.user_metadata?.last_name || ""}`.trim() ||
+              "",
+          })
+
+          if (insertError) {
+            console.error("Error creating profile:", insertError)
+          }
+        }
+
+        setUser(session.user)
+        setIsAuthenticated(true)
+      } catch (error) {
+        console.error("Error checking auth:", error)
+        router.push("/auth")
+      } finally {
+        setIsLoading(false)
       }
     }
 
     checkAuth()
 
-    const urlMessage = searchParams.get("message")
-    if (urlMessage) {
-      setMessage(urlMessage)
-    }
-  }, [searchParams, router, supabase.auth])
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_OUT" || !session) {
+        setIsAuthenticated(false)
+        setUser(null)
+        router.push("/auth")
+      } else if (event === "SIGNED_IN" && session) {
+        setUser(session.user)
+        setIsAuthenticated(true)
+      }
+    })
 
-  const handleGoogleAuth = async () => {
-    setIsGoogleLoading(true)
-    setError(null)
-    setMessage(null)
+    return () => subscription.unsubscribe()
+  }, [router, supabase.auth])
 
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback`,
-        },
-      })
-      if (error) throw error
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Failed to authenticate with Google")
-      setIsGoogleLoading(false)
-    }
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground text-sm md:text-base">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
-  const handleGitHubAuth = async () => {
-    setIsGitHubLoading(true)
-    setError(null)
-    setMessage(null)
+  if (!isAuthenticated) {
+    return null // Will redirect to auth
+  }
 
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "github",
-        options: {
-          redirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/auth/callback`,
-        },
-      })
-      if (error) throw error
-    } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "Failed to authenticate with GitHub")
-      setIsGitHubLoading(false)
+  const renderContent = () => {
+    switch (activeTab) {
+      case "dashboard":
+        return <DashboardPage isPremium={false} />
+      case "income":
+        return <IncomePage isPremium={false} />
+      case "budget":
+        return <BudgetPage isPremium={false} />
+      case "settings":
+        return <SettingsPage />
+      default:
+        return <DashboardPage isPremium={false} />
     }
   }
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <DollarSign className="h-8 w-8 text-blue-600" />
-            <span className="text-2xl font-bold">Orgatreeker</span>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex min-h-[calc(100vh-80px)] w-full items-center justify-center p-6 md:p-10">
-        <div className="w-full max-w-sm">
-          <div className="flex flex-col gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-2xl flex items-center gap-2">
-                  {mode === "login" ? (
-                    <>
-                      <LogIn className="h-6 w-6 text-blue-500" />
-                      Welcome Back
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="h-6 w-6 text-blue-500" />
-                      Get Started
-                    </>
-                  )}
-                </CardTitle>
-                <CardDescription>
-                  {mode === "login"
-                    ? "Sign in to your account using your preferred method"
-                    : "Create your account using your preferred method"}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col gap-4">
-                  <Button
-                    onClick={handleGoogleAuth}
-                    variant="outline"
-                    className="w-full bg-transparent"
-                    disabled={isGoogleLoading || isGitHubLoading}
-                  >
-                    {isGoogleLoading ? (
-                      `${mode === "login" ? "Signing in" : "Signing up"} with Google...`
-                    ) : (
-                      <>
-                        <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-                          <path
-                            fill="currentColor"
-                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                          />
-                          <path
-                            fill="currentColor"
-                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                          />
-                          <path
-                            fill="currentColor"
-                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                          />
-                          <path
-                            fill="currentColor"
-                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                          />
-                        </svg>
-                        Continue with Google
-                      </>
-                    )}
-                  </Button>
-
-                  <Button
-                    onClick={handleGitHubAuth}
-                    variant="outline"
-                    className="w-full bg-transparent"
-                    disabled={isGoogleLoading || isGitHubLoading}
-                  >
-                    {isGitHubLoading ? (
-                      `${mode === "login" ? "Signing in" : "Signing up"} with GitHub...`
-                    ) : (
-                      <>
-                        <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                        </svg>
-                        Continue with GitHub
-                      </>
-                    )}
-                  </Button>
-
-                  {message && (
-                    <Alert>
-                      <AlertDescription className="text-green-600">{message}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  {error && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  <div className="text-center text-sm">
-                    {mode === "login" ? (
-                      <>
-                        New to our platform?{" "}
-                        <button
-                          onClick={() => setMode("signup")}
-                          className="underline underline-offset-4 hover:text-primary"
-                        >
-                          Get started
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        Already have an account?{" "}
-                        <button
-                          onClick={() => setMode("login")}
-                          className="underline underline-offset-4 hover:text-primary"
-                        >
-                          Sign in
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
+      <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+      <main className="container mx-auto px-4 py-4 md:px-6 md:py-8 max-w-7xl">
+        <div className="w-full">{renderContent()}</div>
+      </main>
     </div>
   )
 }

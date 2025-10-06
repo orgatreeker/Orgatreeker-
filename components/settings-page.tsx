@@ -1,244 +1,91 @@
 "use client"
+
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import {
-  Mail,
-  Globe,
-  Moon,
-  Sun,
-  HelpCircle,
-  User,
-  Settings,
-  CreditCard,
-  Camera,
-  Shield,
-  Trash2,
-  Crown,
-} from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { User, Mail, CreditCard, Globe, Moon, Sun, Bell, Shield, HelpCircle } from "lucide-react"
 import { useTheme } from "@/contexts/theme-context"
 import { useCurrency, CURRENCIES } from "@/contexts/currency-context"
-import { BudgetSplitCustomization } from "@/components/budget-split-customization"
-import { LogoutButton } from "@/components/logout-button"
-import { useRouter } from "next/navigation"
 
-interface SettingsPageProps {
-  profile?: any
-  isPremium?: boolean
-}
-
-export function SettingsPage({ profile, isPremium = false }: SettingsPageProps) {
+export function SettingsPage() {
   const { theme, setTheme } = useTheme()
   const { selectedCurrency, setCurrency } = useCurrency()
-  const router = useRouter()
+  const [profileData, setProfileData] = useState({
+    name: "John Doe",
+    email: "john.doe@example.com",
+  })
+  const [notifications, setNotifications] = useState(true)
 
-  const handleUpgrade = () => {
-    router.push("/pricing")
+  const handleProfileSave = () => {
+    // In a real app, this would save to a backend
+    console.log("Profile saved:", profileData)
   }
-
-  const getPlanInfo = () => {
-    if (!profile) return { name: "Free Plan", badge: "Free Plan", variant: "secondary" as const }
-
-    if (profile.subscription_status === "active") {
-      if (profile.subscription_plan === "monthly") {
-        return { name: "Pro Monthly", badge: "Pro Monthly", variant: "default" as const }
-      } else if (profile.subscription_plan === "yearly") {
-        return { name: "Pro Yearly", badge: "Pro Yearly", variant: "default" as const }
-      }
-    }
-
-    return { name: "Free Plan", badge: "Free Plan", variant: "secondary" as const }
-  }
-
-  const planInfo = getPlanInfo()
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <div className="flex items-center gap-3">
-          <Badge variant="secondary">App Settings</Badge>
-          {isPremium && (
-            <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
-              <Crown className="w-3 h-3 mr-1" />
-              Pro
-            </Badge>
-          )}
-        </div>
+        <Badge variant="secondary">Account Settings</Badge>
       </div>
 
       <div className="grid gap-6">
+        {/* Profile Settings */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
               Profile Settings
             </CardTitle>
-            <CardDescription>Manage your profile picture, display name, and personal information</CardDescription>
+            <CardDescription>Manage your personal information and account details</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base">Profile Picture</Label>
-                <p className="text-sm text-muted-foreground">Upload and manage your profile picture</p>
-              </div>
-              <Button variant="outline" className="bg-transparent">
-                <Camera className="mr-2 h-4 w-4" />
-                Change Picture
-              </Button>
-            </div>
-
-            <Separator />
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base">Display Name</Label>
-                <p className="text-sm text-muted-foreground">Update your name shown across the app</p>
-              </div>
-              <Button variant="outline" className="bg-transparent">
-                <Settings className="mr-2 h-4 w-4" />
-                Edit Name
-              </Button>
-            </div>
-
-            <Separator />
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base">Email Address</Label>
-                <p className="text-sm text-muted-foreground">
-                  {profile?.email || "View your account email (managed by Google)"}
-                </p>
-              </div>
-              <Button variant="outline" disabled className="bg-muted">
-                <Mail className="mr-2 h-4 w-4" />
-                View Email
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              Account Settings
-            </CardTitle>
-            <CardDescription>Manage your account security, privacy, and account actions</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base">Account Security</Label>
-                <p className="text-sm text-muted-foreground">View account information and security settings</p>
-              </div>
-              <Button variant="outline" className="bg-transparent">
-                <Shield className="mr-2 h-4 w-4" />
-                Manage Security
-              </Button>
-            </div>
-
-            <Separator />
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base">Sign Out</Label>
-                <p className="text-sm text-muted-foreground">Sign out of your account securely</p>
-              </div>
-              <LogoutButton
-                variant="button"
-                className="bg-transparent border border-input hover:bg-accent hover:text-accent-foreground"
-              >
-                Sign Out
-              </LogoutButton>
-            </div>
-
-            <Separator />
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base text-destructive">Delete Account</Label>
-                <p className="text-sm text-muted-foreground">Permanently delete your account and all data</p>
-              </div>
-              <Button variant="outline" className="text-destructive hover:text-destructive bg-transparent">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Account
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5" />
-              Billing Settings
-            </CardTitle>
-            <CardDescription>Manage your subscription, billing history, and payment methods</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base">Current Plan</Label>
-                <p className="text-sm text-muted-foreground">
-                  {isPremium ? `You are currently on the ${planInfo.name}` : "You are currently on the Free plan"}
-                </p>
-                {isPremium && profile?.subscription_current_period_end && (
-                  <p className="text-xs text-muted-foreground">
-                    Next billing: {new Date(profile.subscription_current_period_end).toLocaleDateString()}
-                  </p>
-                )}
-              </div>
-              <Badge
-                variant={planInfo.variant}
-                className={isPremium ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-white" : ""}
-              >
-                {isPremium && <Crown className="w-3 h-3 mr-1" />}
-                {planInfo.badge}
-              </Badge>
-            </div>
-
-            <Separator />
-
-            {!isPremium ? (
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-base">Upgrade to Pro</Label>
-                  <p className="text-sm text-muted-foreground">Unlock advanced features and unlimited budgets</p>
-                </div>
-                <Button variant="outline" className="bg-transparent" onClick={handleUpgrade}>
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Upgrade Plan
+          <CardContent className="space-y-6">
+            <div className="flex items-center space-x-4">
+              <Avatar className="h-20 w-20">
+                <AvatarImage src="/placeholder.svg?height=80&width=80" alt="Profile" />
+                <AvatarFallback className="text-lg">JD</AvatarFallback>
+              </Avatar>
+              <div className="space-y-2">
+                <h3 className="text-lg font-medium">{profileData.name}</h3>
+                <p className="text-sm text-muted-foreground">{profileData.email}</p>
+                <Button variant="outline" size="sm">
+                  Change Photo
                 </Button>
               </div>
-            ) : (
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label className="text-base">Manage Subscription</Label>
-                  <p className="text-sm text-muted-foreground">Update payment method or cancel subscription</p>
-                </div>
-                <Button variant="outline" className="bg-transparent">
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Manage Billing
-                </Button>
-              </div>
-            )}
+            </div>
 
             <Separator />
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-base">Billing History</Label>
-                <p className="text-sm text-muted-foreground">View your payment history and invoices</p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="name">Full Name</Label>
+                <Input
+                  id="name"
+                  value={profileData.name}
+                  onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                  placeholder="Enter your full name"
+                />
               </div>
-              <Button variant="outline" disabled={!isPremium} className={!isPremium ? "bg-muted" : "bg-transparent"}>
-                <Mail className="mr-2 h-4 w-4" />
-                View History
-              </Button>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={profileData.email}
+                  onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                  placeholder="Enter your email"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button onClick={handleProfileSave}>Save Changes</Button>
             </div>
           </CardContent>
         </Card>
@@ -289,16 +136,136 @@ export function SettingsPage({ profile, isPremium = false }: SettingsPageProps) 
               <div className="space-y-0.5">
                 <Label className="text-base flex items-center gap-2">
                   {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-                  Dark Mode
+                  Theme
                 </Label>
                 <p className="text-sm text-muted-foreground">Switch between light and dark mode</p>
               </div>
               <Switch checked={theme === "dark"} onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")} />
             </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base flex items-center gap-2">
+                  <Bell className="h-4 w-4" />
+                  Notifications
+                </Label>
+                <p className="text-sm text-muted-foreground">Receive notifications about your financial activities</p>
+              </div>
+              <Switch checked={notifications} onCheckedChange={setNotifications} />
+            </div>
           </CardContent>
         </Card>
 
-        <BudgetSplitCustomization />
+        {/* Account & Billing */}
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Account
+              </CardTitle>
+              <CardDescription>Manage your account security and privacy</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Account Status</Label>
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant="default"
+                    className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                  >
+                    Active
+                  </Badge>
+                  <span className="text-sm text-muted-foreground">Premium Plan</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Member Since</Label>
+                <p className="text-sm text-muted-foreground">January 15, 2024</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Data Export</Label>
+                <Button variant="outline" size="sm" className="w-full bg-transparent">
+                  Download My Data
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Account Actions</Label>
+                <div className="space-y-2">
+                  <Button variant="outline" size="sm" className="w-full bg-transparent">
+                    Change Password
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-destructive hover:text-destructive bg-transparent"
+                  >
+                    Delete Account
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Billing
+              </CardTitle>
+              <CardDescription>Manage your subscription and payment methods</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Current Plan</Label>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium">Premium Plan</p>
+                    <p className="text-sm text-muted-foreground">$9.99/month</p>
+                  </div>
+                  <Badge variant="outline">Active</Badge>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Next Billing Date</Label>
+                <p className="text-sm text-muted-foreground">February 15, 2024</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Payment Method</Label>
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  <span className="text-sm">•••• •••• •••• 4242</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Billing Actions</Label>
+                <div className="space-y-2">
+                  <Button variant="outline" size="sm" className="w-full bg-transparent">
+                    Update Payment Method
+                  </Button>
+                  <Button variant="outline" size="sm" className="w-full bg-transparent">
+                    View Billing History
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full text-destructive hover:text-destructive bg-transparent"
+                  >
+                    Cancel Subscription
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
         {/* Help & Support */}
         <Card>

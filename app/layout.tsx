@@ -6,8 +6,6 @@ import "./globals.css"
 import { ThemeProvider } from "@/contexts/theme-context"
 import { DateProvider } from "@/contexts/date-context"
 import { CurrencyProvider } from "@/contexts/currency-context"
-import { PerformanceProvider } from "@/components/performance-provider"
-import { OptimizedSmoothScroll } from "@/components/optimized-smooth-scroll"
 
 export const metadata: Metadata = {
   title: "FinanceTracker - Personal Finance Management",
@@ -34,11 +32,7 @@ html {
       <body>
         <ThemeProvider>
           <CurrencyProvider>
-            <DateProvider>
-              <PerformanceProvider>
-                <OptimizedSmoothScroll>{children}</OptimizedSmoothScroll>
-              </PerformanceProvider>
-            </DateProvider>
+            <DateProvider>{children}</DateProvider>
           </CurrencyProvider>
         </ThemeProvider>
       </body>

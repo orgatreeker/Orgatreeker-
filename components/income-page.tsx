@@ -19,23 +19,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import {
-  Plus,
-  MoreHorizontal,
-  Edit,
-  Trash2,
-  DollarSign,
-  TrendingUp,
-  Loader2,
-  Crown,
-  Target,
-  PiggyBank,
-} from "lucide-react"
+import { Plus, MoreHorizontal, Edit, Trash2, DollarSign, TrendingUp, Loader2, Lock, Crown } from "lucide-react"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { useRouter } from "next/navigation"
 import { useDateContext } from "@/contexts/date-context"
 import { useCurrency } from "@/contexts/currency-context"
-import { useBudgetSplit } from "@/hooks/use-budget-split"
 import { MonthPicker } from "@/components/month-picker" // Import MonthPicker component
 
 interface IncomeSource {
@@ -65,7 +53,6 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
   const router = useRouter()
   const { selectedDate, selectedYear, selectedMonthNumber } = useDateContext()
   const { formatAmount } = useCurrency()
-  const { budgetSplit, isLoading: budgetSplitLoading } = useBudgetSplit()
   const [formData, setFormData] = useState({
     name: "",
     category: "",
@@ -169,13 +156,12 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
 
   const totalMonthlyIncome = incomeSources.reduce((sum, source) => sum + source.amount, 0)
 
-  const budgetAllocation = {
-    needs: (totalMonthlyIncome * budgetSplit.needs_percentage) / 100,
-    wants: (totalMonthlyIncome * budgetSplit.wants_percentage) / 100,
-    savings: (totalMonthlyIncome * budgetSplit.savings_percentage) / 100,
-  }
-
   const handleOpenDialog = (source?: IncomeSource) => {
+    if (!source && !isPremium && incomeSources.length >= 5) {
+      setError("Free users can only add up to 5 income sources. Upgrade to Pro for unlimited income sources.")
+      return
+    }
+
     if (source) {
       setEditingSource(source)
       setFormData({
@@ -192,6 +178,11 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
 
   const handleSaveSource = async () => {
     if (!formData.name || !formData.category || !formData.amount || !user) return
+
+    if (!editingSource && !isPremium && incomeSources.length >= 5) {
+      setError("Free users can only add up to 5 income sources. Upgrade to Pro for unlimited income sources.")
+      return
+    }
 
     setIsSaving(true)
     setError(null)
@@ -248,7 +239,7 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
     }
   }
 
-  if (isLoading || budgetSplitLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -272,9 +263,14 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {!isPremium && incomeSources.length >= 4 && (
+            <Badge variant="outline" className="text-xs">
+              {incomeSources.length}/5 sources used
+            </Badge>
+          )}
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => handleOpenDialog()}>
+              <Button onClick={() => handleOpenDialog()} disabled={!isPremium && incomeSources.length >= 5}>
                 <Plus className="mr-2 h-4 w-4" />
                 Add Income Source
               </Button>
@@ -346,54 +342,43 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Income</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{formatAmount(totalMonthlyIncome)}</div>
-            <p className="text-xs text-muted-foreground flex items-center mt-1">
-              <TrendingUp className="h-3 w-3 mr-1 text-green-600" />
-              {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-            </p>
+      {!isPremium && incomeSources.length >= 5 && (
+        <Card className="border-orange-200 bg-orange-50/50">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-orange-100 rounded-full">
+                  <Lock className="h-4 w-4 text-orange-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-orange-900">Income Source Limit Reached</p>
+                  <p className="text-sm text-orange-700">You've reached the 5 income source limit for free users.</p>
+                </div>
+              </div>
+              <Button size="sm" className="bg-orange-600 hover:bg-orange-700">
+                <Crown className="w-3 h-3 mr-1" />
+                Upgrade to Pro
+              </Button>
+            </div>
           </CardContent>
         </Card>
+      )}
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Needs Budget</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatAmount(budgetAllocation.needs)}</div>
-            <p className="text-xs text-muted-foreground">{budgetSplit.needs_percentage}% of income</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Wants Budget</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatAmount(budgetAllocation.wants)}</div>
-            <p className="text-xs text-muted-foreground">{budgetSplit.wants_percentage}% of income</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Savings Target</CardTitle>
-            <PiggyBank className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatAmount(budgetAllocation.savings)}</div>
-            <p className="text-xs text-muted-foreground">{budgetSplit.savings_percentage}% of income</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">
+            Total Income - {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+          </CardTitle>
+          <DollarSign className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold">{formatAmount(totalMonthlyIncome)}</div>
+          <p className="text-xs text-muted-foreground flex items-center mt-1">
+            <TrendingUp className="h-3 w-3 mr-1 text-green-600" />
+            Monthly income for selected period
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -449,6 +434,9 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
           <CardDescription>
             Manage your income sources for{" "}
             {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+            {!isPremium && (
+              <span className="ml-2 text-xs text-muted-foreground">({incomeSources.length}/5 sources used)</span>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>

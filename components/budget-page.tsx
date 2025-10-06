@@ -38,7 +38,6 @@ import { useRouter } from "next/navigation"
 import { MonthPicker } from "@/components/month-picker"
 import { useDateContext } from "@/contexts/date-context"
 import { useCurrency } from "@/contexts/currency-context"
-import { useBudgetSplit } from "@/hooks/use-budget-split"
 
 interface Transaction {
   id: string
@@ -93,7 +92,6 @@ export function BudgetPage({ isPremium = false }: BudgetPageProps) {
   const router = useRouter()
   const { selectedDate, selectedYear, selectedMonthNumber } = useDateContext()
   const { formatAmount } = useCurrency() // Added currency context for dynamic formatting
-  const { budgetSplit, isLoading: budgetSplitLoading } = useBudgetSplit()
   const [formData, setFormData] = useState({
     name: "",
     budget: "",
@@ -215,27 +213,9 @@ export function BudgetPage({ isPremium = false }: BudgetPageProps) {
     const savingsSpent = savingsCategories.reduce((sum, cat) => sum + getSpentAmount(cat.id), 0)
 
     return [
-      {
-        category: "Needs",
-        budgeted: needsBudgeted,
-        spent: needsSpent,
-        percentage: budgetSplit.needs_percentage,
-        color: "#3b82f6", // Updated to blue color for better contrast
-      },
-      {
-        category: "Wants",
-        budgeted: wantsBudgeted,
-        spent: wantsSpent,
-        percentage: budgetSplit.wants_percentage,
-        color: "#10b981", // Updated to green color
-      },
-      {
-        category: "Savings",
-        budgeted: savingsBudgeted,
-        spent: savingsSpent,
-        percentage: budgetSplit.savings_percentage,
-        color: "#8b5cf6", // Updated to purple color
-      },
+      { category: "Needs", budgeted: needsBudgeted, spent: needsSpent, percentage: 50, color: "#8b5cf6" },
+      { category: "Wants", budgeted: wantsBudgeted, spent: wantsSpent, percentage: 30, color: "#06b6d4" },
+      { category: "Savings", budgeted: savingsBudgeted, spent: savingsSpent, percentage: 20, color: "#10b981" },
     ]
   }
 
@@ -430,7 +410,7 @@ export function BudgetPage({ isPremium = false }: BudgetPageProps) {
   const filteredCategories =
     categoryFilter === "All" ? categories : categories.filter((category) => category.type === categoryFilter)
 
-  if (isLoading || budgetSplitLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -454,23 +434,6 @@ export function BudgetPage({ isPremium = false }: BudgetPageProps) {
           )}
         </div>
       </div>
-
-      {!budgetSplitLoading &&
-        (budgetSplit.needs_percentage !== 50 ||
-          budgetSplit.wants_percentage !== 30 ||
-          budgetSplit.savings_percentage !== 20) && (
-          <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Target className="h-4 w-4 text-blue-600" />
-              <span className="font-medium text-blue-900 dark:text-blue-100">Custom Budget Split Active</span>
-            </div>
-            <p className="text-sm text-blue-700 dark:text-blue-300">
-              Your budget targets are based on your custom split: {budgetSplit.needs_percentage}% Needs,{" "}
-              {budgetSplit.wants_percentage}% Wants, {budgetSplit.savings_percentage}% Savings.
-              <span className="font-medium"> Targets have been updated to reflect your preferences.</span>
-            </p>
-          </div>
-        )}
 
       {/* Budget Overview Cards */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -501,7 +464,7 @@ export function BudgetPage({ isPremium = false }: BudgetPageProps) {
               <CardContent className="space-y-3">
                 <div className="bg-muted/50 p-3 rounded-lg space-y-2">
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Your Budget Target:</span>
+                    <span>50/30/20 Rule Target:</span>
                     <span>{item.percentage}% of income</span>
                   </div>
                   <div className="flex justify-between text-sm font-medium">
@@ -511,11 +474,6 @@ export function BudgetPage({ isPremium = false }: BudgetPageProps) {
                       {formatAmount(targetDifference)}
                     </span>
                   </div>
-                  {item.percentage !== (item.category === "Needs" ? 50 : item.category === "Wants" ? 30 : 20) && (
-                    <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                      ✨ Custom target (was {item.category === "Needs" ? 50 : item.category === "Wants" ? 30 : 20}%)
-                    </div>
-                  )}
                 </div>
 
                 <div className="flex justify-between text-sm">
