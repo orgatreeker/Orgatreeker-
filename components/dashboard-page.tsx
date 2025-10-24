@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
 import { TrendingUp, TrendingDown, DollarSign, PiggyBank, Target, Loader2, Lock, Crown } from "lucide-react"
 import {
   LineChart,
@@ -19,10 +19,14 @@ import {
   PieChart,
   Pie,
   Cell,
+  BarChart,
+  Bar,
 } from "recharts"
 import { useRouter } from "next/navigation"
+import { useUser } from "@clerk/nextjs"
 import { useDateContext } from "@/contexts/date-context"
 import { useCurrency } from "@/contexts/currency-context"
+import { useData } from "@/contexts/data-context"
 
 interface IncomeSource {
   id: string
@@ -44,16 +48,14 @@ interface BudgetCategory {
 
 interface Transaction {
   id: string
-  description: string
+  category: string
+  subcategory: string
+  notes: string
   amount: number
   transaction_date: string
-  category_id: string
+  category_id?: string
   month: number
   year: number
-  budget_categories: {
-    name: string
-    type: string
-  }
 }
 
 interface DashboardPageProps {
@@ -61,172 +63,126 @@ interface DashboardPageProps {
 }
 
 export function DashboardPage({ isPremium = false }: DashboardPageProps) {
+  const {
+    incomeSources,
+    budgetCategories,
+    transactions,
+    isLoading,
+  } = useData()
+
   const [sortBy, setSortBy] = useState("recent")
-  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [user, setUser] = useState<any>(null)
-  const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([])
-  const [budgetCategories, setBudgetCategories] = useState<BudgetCategory[]>([])
-  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [showAllCategories, setShowAllCategories] = useState(false)
+  const { user } = useUser()
   const [historicalData, setHistoricalData] = useState<any[]>([])
+  const [historicalIncomeData, setHistoricalIncomeData] = useState<any[]>([])
   const [previousMonthData, setPreviousMonthData] = useState<{ income: number; expenses: number }>({
     income: 0,
     expenses: 0,
   })
+  const [isLoadingCharts, setIsLoadingCharts] = useState(true)
   const router = useRouter()
   const { selectedDate, selectedYear, selectedMonthNumber } = useDateContext()
   const { formatAmount } = useCurrency()
 
-  const supabase = createClient()
-
+  // Only fetch historical data once on mount or when month/year changes
   useEffect(() => {
-    checkUser()
-  }, [])
+    const initializeHistoricalData = async () => {
+      if (!user?.id) return
 
-  useEffect(() => {
-    if (user) {
-      Promise.all([
-        fetchIncomeSources(user.id),
-        fetchBudgetData(user.id),
-        fetchTransactions(user.id),
-        fetchHistoricalData(user.id),
-        fetchPreviousMonthData(user.id),
-      ])
+      setIsLoadingCharts(true)
+      try {
+        await Promise.all([
+          fetchHistoricalData(user.id),
+          fetchPreviousMonthData(user.id),
+          fetchHistoricalIncomeData(user.id)
+        ])
+      } catch (error) {
+        console.error("Error initializing data:", error)
+      } finally {
+        setIsLoadingCharts(false)
+      }
     }
-  }, [selectedYear, selectedMonthNumber, user])
 
-  const checkUser = async () => {
+    initializeHistoricalData()
+  }, [user?.id, selectedYear, selectedMonthNumber])
+
+  const fetchHistoricalIncomeData = async (userId: string) => {
     try {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser()
-      if (error) throw error
+      const { getIncomeSources } = await import('@/lib/supabase/database')
 
-      if (!user) {
-        router.push("/auth/login")
-        return
+      // Prepare all months we need to fetch
+      const monthsToFetch = []
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date(selectedYear, selectedMonthNumber - 1 - i, 1)
+        monthsToFetch.push({
+          date,
+          month: date.getMonth() + 1,
+          year: date.getFullYear()
+        })
       }
 
-      setUser(user)
-      await Promise.all([
-        fetchIncomeSources(user.id),
-        fetchBudgetData(user.id),
-        fetchTransactions(user.id),
-        fetchHistoricalData(user.id),
-        fetchPreviousMonthData(user.id),
-      ])
+      // Fetch all months in parallel
+      const results = await Promise.all(
+        monthsToFetch.map(({ month, year }) => getIncomeSources(userId, month, year))
+      )
+
+      // Process results
+      const historicalMonths = monthsToFetch.map((monthData, index) => {
+        const sources = results[index]
+        const totalIncome = sources.reduce((sum: number, source: IncomeSource) => sum + source.amount, 0)
+
+        return {
+          month: monthData.date.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+          income: totalIncome,
+        }
+      })
+
+      setHistoricalIncomeData(historicalMonths)
     } catch (error) {
-      console.error("Error checking user:", error)
-      router.push("/auth/login")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const fetchIncomeSources = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("income_sources")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("month", selectedMonthNumber)
-        .eq("year", selectedYear)
-
-      if (error) throw error
-      setIncomeSources(data || [])
-    } catch (error) {
-      console.error("Error fetching income sources:", error)
-      setError("Failed to load income data")
-    }
-  }
-
-  const fetchBudgetData = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("budget_categories")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("month", selectedMonthNumber)
-        .eq("year", selectedYear)
-
-      if (error) throw error
-      setBudgetCategories(data || [])
-    } catch (error) {
-      console.error("Error fetching budget data:", error)
-      setError("Failed to load budget data")
-    }
-  }
-
-  const fetchTransactions = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select(
-          `
-          *,
-          budget_categories (
-            name,
-            type
-          )
-        `,
-        )
-        .eq("user_id", userId)
-        .eq("month", selectedMonthNumber)
-        .eq("year", selectedYear)
-        .order("transaction_date", { ascending: false })
-        .limit(10)
-
-      if (error) throw error
-      setTransactions(data || [])
-    } catch (error) {
-      console.error("Error fetching transactions:", error)
-      setError("Failed to load transactions")
+      console.error("Error fetching historical income data:", error)
     }
   }
 
   const fetchHistoricalData = async (userId: string) => {
     try {
-      const [incomeData, transactionData] = await Promise.all([
-        supabase
-          .from("income_sources")
-          .select("amount, month, year")
-          .eq("user_id", userId)
-          .gte("year", selectedYear - 1),
-        supabase
-          .from("transactions")
-          .select("amount, month, year")
-          .eq("user_id", userId)
-          .gte("year", selectedYear - 1),
-      ])
-
-      if (incomeData.error) throw incomeData.error
-      if (transactionData.error) throw transactionData.error
-
-      const incomeByMonth = (incomeData.data || []).reduce((acc: any, item) => {
-        const key = `${item.year}-${item.month}`
-        acc[key] = (acc[key] || 0) + item.amount
-        return acc
-      }, {})
-
-      const expensesByMonth = (transactionData.data || []).reduce((acc: any, item) => {
-        const key = `${item.year}-${item.month}`
-        acc[key] = (acc[key] || 0) + Math.abs(item.amount)
-        return acc
-      }, {})
-
-      const chartData = []
+      const { getIncomeSources, getTransactions } = await import('@/lib/supabase/database')
+      
+      // Prepare all months to fetch
+      const monthsToFetch = []
       for (let i = 5; i >= 0; i--) {
         const date = new Date(selectedYear, selectedMonthNumber - 1 - i, 1)
-        const key = `${date.getFullYear()}-${date.getMonth() + 1}`
-        chartData.push({
-          month: date.toLocaleDateString("en-US", { month: "short" }),
-          income: incomeByMonth[key] || 0,
-          expenses: expensesByMonth[key] || 0,
+        monthsToFetch.push({
+          date,
+          month: date.getMonth() + 1,
+          year: date.getFullYear()
         })
       }
-
-      setHistoricalData(chartData)
+      
+      // Fetch all months in parallel (12 parallel requests instead of 6 sequential)
+      const allResults = await Promise.all(
+        monthsToFetch.flatMap(({ month, year }) => [
+          getIncomeSources(userId, month, year),
+          getTransactions(userId, month, year)
+        ])
+      )
+      
+      // Process results
+      const historicalMonths = monthsToFetch.map((monthData, index) => {
+        const incomeData = allResults[index * 2]
+        const transactionData = allResults[index * 2 + 1]
+        
+        const income = incomeData.reduce((sum, item) => sum + item.amount, 0)
+        const expenses = transactionData.reduce((sum, item) => sum + Math.abs(item.amount), 0)
+        
+        return {
+          month: monthData.date.toLocaleDateString("en-US", { month: "short" }),
+          income,
+          expenses,
+        }
+      })
+      
+      setHistoricalData(historicalMonths)
     } catch (error) {
       console.error("Error fetching historical data:", error)
     }
@@ -234,30 +190,19 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
 
   const fetchPreviousMonthData = async (userId: string) => {
     try {
+      const { getIncomeSources, getTransactions } = await import('@/lib/supabase/database')
+      
       const prevDate = new Date(selectedYear, selectedMonthNumber - 2, 1)
       const prevMonth = prevDate.getMonth() + 1
       const prevYear = prevDate.getFullYear()
 
       const [incomeData, transactionData] = await Promise.all([
-        supabase
-          .from("income_sources")
-          .select("amount")
-          .eq("user_id", userId)
-          .eq("month", prevMonth)
-          .eq("year", prevYear),
-        supabase
-          .from("transactions")
-          .select("amount")
-          .eq("user_id", userId)
-          .eq("month", prevMonth)
-          .eq("year", prevYear),
+        getIncomeSources(userId, prevMonth, prevYear),
+        getTransactions(userId, prevMonth, prevYear)
       ])
 
-      if (incomeData.error) throw incomeData.error
-      if (transactionData.error) throw transactionData.error
-
-      const prevIncome = (incomeData.data || []).reduce((sum, item) => sum + item.amount, 0)
-      const prevExpenses = (transactionData.data || []).reduce((sum, item) => sum + Math.abs(item.amount), 0)
+      const prevIncome = incomeData.reduce((sum, item) => sum + item.amount, 0)
+      const prevExpenses = transactionData.reduce((sum, item) => sum + Math.abs(item.amount), 0)
 
       setPreviousMonthData({ income: prevIncome, expenses: prevExpenses })
     } catch (error) {
@@ -265,66 +210,121 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
     }
   }
 
-  const totalIncome = incomeSources.reduce((sum, source) => sum + source.amount, 0)
-  const totalBudgeted = budgetCategories.reduce((sum, category) => sum + category.budgeted_amount, 0)
-  const totalSpent = transactions.reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0)
-  const totalSavings = totalIncome - totalSpent
+  // Memoize calculated values to prevent unnecessary recalculations
+  const totalIncome = useMemo(
+    () => incomeSources.reduce((sum, source) => sum + source.amount, 0),
+    [incomeSources]
+  )
 
-  const calculateGrowthPercentage = () => {
+  const totalBudgeted = useMemo(
+    () => budgetCategories.reduce((sum, category) => sum + category.budgeted_amount, 0),
+    [budgetCategories]
+  )
+
+  const totalSpent = useMemo(
+    () => transactions.reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0),
+    [transactions]
+  )
+
+  const totalSavings = useMemo(() => totalIncome - totalSpent, [totalIncome, totalSpent])
+
+  // Memoize budget overview data
+  const budgetOverviewData = useMemo(() => {
+    const getSpentAmount = (categoryId: string) => {
+      return transactions
+        .filter((transaction) => transaction.category_id === categoryId)
+        .reduce((sum, transaction) => sum + transaction.amount, 0)
+    }
+
+    const needsCategories = budgetCategories.filter((cat) => cat.type === "Needs")
+    const wantsCategories = budgetCategories.filter((cat) => cat.type === "Wants")
+    const savingsCategories = budgetCategories.filter((cat) => cat.type === "Savings")
+
+    const needsBudgeted = needsCategories.reduce((sum, cat) => sum + cat.budgeted_amount, 0)
+    const wantsBudgeted = wantsCategories.reduce((sum, cat) => sum + cat.budgeted_amount, 0)
+    const savingsBudgeted = savingsCategories.reduce((sum, cat) => sum + cat.budgeted_amount, 0)
+
+    const needsSpent = needsCategories.reduce((sum, cat) => sum + getSpentAmount(cat.id), 0)
+    const wantsSpent = wantsCategories.reduce((sum, cat) => sum + getSpentAmount(cat.id), 0)
+    const savingsSpent = savingsCategories.reduce((sum, cat) => sum + getSpentAmount(cat.id), 0)
+
+    return [
+      { category: "Needs", budgeted: needsBudgeted, spent: needsSpent, color: "#8b5cf6" },
+      { category: "Wants", budgeted: wantsBudgeted, spent: wantsSpent, color: "#06b6d4" },
+      { category: "Savings", budgeted: savingsBudgeted, spent: savingsSpent, color: "#10b981" },
+    ]
+  }, [budgetCategories, transactions])
+
+  const budgetPieChartData = useMemo(
+    () => budgetOverviewData.map((item) => ({
+      name: item.category,
+      value: item.budgeted,
+      color: item.color,
+    })),
+    [budgetOverviewData]
+  )
+
+  const budgetBarChartData = useMemo(
+    () => budgetOverviewData.map((item) => ({
+      category: item.category,
+      budgeted: item.budgeted,
+      spent: item.spent,
+    })),
+    [budgetOverviewData]
+  )
+
+  const growthPercentage = useMemo(() => {
     const currentSavings = totalSavings
     const previousSavings = previousMonthData.income - previousMonthData.expenses
 
     if (previousSavings === 0) return 0
     return Math.round(((currentSavings - previousSavings) / Math.abs(previousSavings)) * 100)
-  }
+  }, [totalSavings, previousMonthData])
 
-  const growthPercentage = calculateGrowthPercentage()
+  // Memoize pie chart data
+  const pieData = useMemo(() => {
+    const expensesBySubcategory = transactions.reduce(
+      (acc, transaction) => {
+        const subcategory = transaction.subcategory || "Other"
+        acc[subcategory] = (acc[subcategory] || 0) + Math.abs(transaction.amount)
+        return acc
+      },
+      {} as Record<string, number>,
+    )
 
-  const expensesByType = transactions.reduce(
-    (acc, transaction) => {
-      const type = transaction.budget_categories?.type || "Other"
-      acc[type] = (acc[type] || 0) + Math.abs(transaction.amount)
-      return acc
-    },
-    {} as Record<string, number>,
-  )
+    const generateColor = (index: number, total: number) => {
+      const hue = (index * 360) / total
+      return `hsl(${hue}, 70%, 60%)`
+    }
 
-  const pieData = [
-    {
-      name: "Needs",
-      value: totalSpent > 0 ? Math.round(((expensesByType.Needs || 0) / totalSpent) * 100) : 0,
-      amount: expensesByType.Needs || 0,
-      color: "#8b5cf6", // Purple-500
-    },
-    {
-      name: "Wants",
-      value: totalSpent > 0 ? Math.round(((expensesByType.Wants || 0) / totalSpent) * 100) : 0,
-      amount: expensesByType.Wants || 0,
-      color: "#06b6d4", // Cyan-500
-    },
-    {
-      name: "Savings",
-      value: totalSpent > 0 ? Math.round(((expensesByType.Savings || 0) / totalSpent) * 100) : 0,
-      amount: expensesByType.Savings || 0,
-      color: "#10b981", // Emerald-500
-    },
-  ]
+    return Object.entries(expensesBySubcategory)
+      .map(([name, amount], index, arr) => ({
+        name,
+        value: totalSpent > 0 ? ((amount / totalSpent) * 100) : 0,
+        amount,
+        color: generateColor(index, arr.length),
+      }))
+      .filter((item) => item.amount > 0)
+      .sort((a, b) => b.amount - a.amount)
+  }, [transactions, totalSpent])
 
   const formatCurrency = (amount: number) => {
     return formatAmount(amount)
   }
 
-  const sortedTransactions = [...transactions].sort((a, b) => {
-    switch (sortBy) {
-      case "highest":
-        return Math.abs(b.amount) - Math.abs(a.amount)
-      case "lowest":
-        return Math.abs(a.amount) - Math.abs(b.amount)
-      case "recent":
-      default:
-        return new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
-    }
-  })
+  const sortedTransactions = useMemo(() => {
+    return [...transactions].sort((a, b) => {
+      switch (sortBy) {
+        case "highest":
+          return Math.abs(b.amount) - Math.abs(a.amount)
+        case "lowest":
+          return Math.abs(a.amount) - Math.abs(b.amount)
+        case "recent":
+        default:
+          return new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime()
+      }
+    })
+  }, [transactions, sortBy])
 
   if (isLoading) {
     return (
@@ -426,6 +426,96 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
         </Card>
       </div>
 
+      {/* Income Growth Trend Chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Income Growth Trend</CardTitle>
+          <CardDescription>
+            Monthly income progression over the last 6 months ending in {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingCharts ? (
+            <div className="space-y-3 h-[300px] flex flex-col justify-center">
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-6 w-full" />
+              <Skeleton className="h-6 w-full" />
+            </div>
+          ) : historicalIncomeData.length > 0 && historicalIncomeData.some(d => d.income > 0) ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={historicalIncomeData}>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis
+                  dataKey="month"
+                  axisLine={false}
+                  tickLine={false}
+                  className="text-muted-foreground"
+                  tick={{ fontSize: 12 }}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  className="text-muted-foreground"
+                  tick={{ fontSize: 12 }}
+                  tickFormatter={(value) => {
+                    if (value >= 1000) {
+                      return `$${(value / 1000).toFixed(1)}k`
+                    }
+                    return `$${value}`
+                  }}
+                />
+                <Tooltip
+                  formatter={(value) => [formatAmount(Number(value)), "Monthly Income"]}
+                  labelStyle={{ color: "hsl(var(--foreground))" }}
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--background))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "8px",
+                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                  }}
+                  animationDuration={300}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="income"
+                  stroke="#10b981"
+                  strokeWidth={3}
+                  dot={{
+                    fill: "#10b981",
+                    strokeWidth: 3,
+                    r: 5,
+                    stroke: "#ffffff",
+                    strokeOpacity: 0.8,
+                  }}
+                  activeDot={{
+                    r: 7,
+                    fill: "#10b981",
+                    stroke: "#ffffff",
+                    strokeWidth: 2,
+                    filter: "drop-shadow(0 2px 4px rgba(16, 185, 129, 0.4))",
+                  }}
+                  name="Monthly Income"
+                  filter="drop-shadow(0 2px 4px rgba(16, 185, 129, 0.2))"
+                  animationDuration={800}
+                  animationEasing="ease-in-out"
+                  isAnimationActive={!isLoadingCharts}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[300px] text-center">
+              <TrendingUp className="h-12 w-12 text-muted-foreground mb-3" />
+              <p className="text-muted-foreground font-medium">No income data to display</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Add income sources to see your growth trend
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -433,40 +523,55 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
             <CardDescription>Monthly comparison over the last 6 months</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={historicalData}>
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis dataKey="month" className="text-muted-foreground" tick={{ fontSize: 12 }} />
-                <YAxis className="text-muted-foreground" tick={{ fontSize: 12 }} />
-                <Tooltip
-                  formatter={(value) => formatCurrency(Number(value))}
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--background))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px",
-                    boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="income"
-                  stroke="#10b981"
-                  strokeWidth={3}
-                  name="Income"
-                  dot={{ fill: "#10b981", strokeWidth: 2, r: 4 }}
-                  activeDot={{ r: 6, stroke: "#10b981", strokeWidth: 2 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="expenses"
-                  stroke="#f59e0b"
-                  strokeWidth={3}
-                  name="Expenses"
-                  dot={{ fill: "#f59e0b", strokeWidth: 2, r: 4 }}
-                  activeDot={{ r: 6, stroke: "#f59e0b", strokeWidth: 2 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {isLoadingCharts ? (
+              <div className="space-y-3 h-[300px] flex flex-col justify-center">
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={historicalData}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis dataKey="month" className="text-muted-foreground" tick={{ fontSize: 12 }} />
+                  <YAxis className="text-muted-foreground" tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    formatter={(value) => formatCurrency(Number(value))}
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                    }}
+                    animationDuration={300}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="income"
+                    stroke="#10b981"
+                    strokeWidth={3}
+                    name="Income"
+                    dot={{ fill: "#10b981", strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, stroke: "#10b981", strokeWidth: 2 }}
+                    animationDuration={800}
+                    animationEasing="ease-in-out"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="expenses"
+                    stroke="#f59e0b"
+                    strokeWidth={3}
+                    name="Expenses"
+                    dot={{ fill: "#f59e0b", strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, stroke: "#f59e0b", strokeWidth: 2 }}
+                    animationDuration={800}
+                    animationEasing="ease-in-out"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
@@ -503,48 +608,111 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
                 </div>
               </div>
             ) : totalSpent > 0 ? (
+              <ResponsiveContainer width="100%" height={450}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={true}
+                    label={({ name, value }) => `${name}: ${value.toFixed(1)}%`}
+                    outerRadius={140}
+                    paddingAngle={2}
+                    dataKey="value"
+                    stroke="hsl(var(--background))"
+                    strokeWidth={2}
+                    animationBegin={0}
+                    animationDuration={800}
+                    animationEasing="ease-out"
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: any) => `${Number(value).toFixed(1)}%`}
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                    }}
+                    animationDuration={200}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                No expense data available for{" "}
+                {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Budget Charts */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Budget Allocation</CardTitle>
+            <CardDescription>
+              Distribution for {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingCharts ? (
+              <div className="space-y-3 h-[300px] flex flex-col justify-center">
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+              </div>
+            ) : budgetPieChartData.some((item) => item.value > 0) ? (
               <>
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={pieData.filter((item) => item.amount > 0)}
+                      data={budgetPieChartData.filter((item) => item.value > 0)}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
                       outerRadius={100}
                       paddingAngle={5}
                       dataKey="value"
-                      stroke="hsl(var(--background))"
+                      stroke="#ffffff"
                       strokeWidth={2}
+                      animationBegin={0}
+                      animationDuration={800}
+                      animationEasing="ease-out"
                     >
-                      {pieData
-                        .filter((item) => item.amount > 0)
+                      {budgetPieChartData
+                        .filter((item) => item.value > 0)
                         .map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value) => `${value}%`}
+                      formatter={(value) => [formatCurrency(Number(value)), "Amount"]}
                       contentStyle={{
                         backgroundColor: "hsl(var(--background))",
                         border: "1px solid hsl(var(--border))",
                         borderRadius: "8px",
                         boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
                       }}
+                      animationDuration={200}
                     />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="flex justify-center space-x-4 mt-4">
-                  {pieData
-                    .filter((entry) => entry.amount > 0)
+                  {budgetPieChartData
+                    .filter((entry) => entry.value > 0)
                     .map((entry, index) => (
                       <div key={index} className="flex items-center space-x-2">
-                        <div
-                          className="w-3 h-3 rounded-full border border-background"
-                          style={{ backgroundColor: entry.color }}
-                        />
-                        <span className="text-sm font-medium">
-                          {entry.name}: {formatCurrency(entry.amount)}
+                        <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: entry.color }} />
+                        <span className="text-sm text-muted-foreground">
+                          {entry.name}: {formatCurrency(entry.value)}
                         </span>
                       </div>
                     ))}
@@ -552,7 +720,71 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
               </>
             ) : (
               <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-                No expense data available for{" "}
+                No budget data available for{" "}
+                {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Actual vs Budget</CardTitle>
+            <CardDescription>
+              Comparison for {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingCharts ? (
+              <div className="space-y-3 h-[300px] flex flex-col justify-center">
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+              </div>
+            ) : budgetBarChartData.some((item) => item.budgeted > 0 || item.spent > 0) ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={budgetBarChartData} barGap={10}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis dataKey="category" axisLine={false} tickLine={false} className="text-muted-foreground" />
+                  <YAxis axisLine={false} tickLine={false} className="text-muted-foreground" />
+                  <Tooltip
+                    formatter={(value, name) => [formatCurrency(Number(value)), name]}
+                    labelStyle={{ color: "hsl(var(--foreground))" }}
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+                    }}
+                    animationDuration={200}
+                  />
+                  <Bar
+                    dataKey="budgeted"
+                    fill="#8b5cf6"
+                    name="Budgeted"
+                    radius={[4, 4, 0, 0]}
+                    filter="drop-shadow(0 2px 4px rgba(139, 92, 246, 0.2))"
+                    animationBegin={0}
+                    animationDuration={800}
+                    animationEasing="ease-out"
+                  />
+                  <Bar
+                    dataKey="spent"
+                    fill="#f59e0b"
+                    name="Spent"
+                    radius={[4, 4, 0, 0]}
+                    filter="drop-shadow(0 2px 4px rgba(245, 158, 11, 0.2))"
+                    animationBegin={0}
+                    animationDuration={800}
+                    animationEasing="ease-out"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                No budget data available for{" "}
                 {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
               </div>
             )}
@@ -598,7 +830,7 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Category</TableHead>
-                  <TableHead>Description</TableHead>
+                  <TableHead>Budget Category</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
                 </TableRow>
               </TableHeader>
@@ -609,9 +841,9 @@ export function DashboardPage({ isPremium = false }: DashboardPageProps) {
                       {new Date(transaction.transaction_date).toLocaleDateString()}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{transaction.budget_categories?.name || "Unknown"}</Badge>
+                      <Badge variant="outline">{transaction.category}</Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{transaction.description}</TableCell>
+                    <TableCell className="text-muted-foreground">{transaction.subcategory}</TableCell>
                     <TableCell className="text-right">
                       {transaction.amount < 0 ? (
                         <span className="text-red-600 font-medium">

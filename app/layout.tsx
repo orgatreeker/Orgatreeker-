@@ -1,11 +1,13 @@
 import type React from "react"
 import type { Metadata } from "next"
+import { ClerkProvider } from "@clerk/nextjs"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import "./globals.css"
 import { ThemeProvider } from "@/contexts/theme-context"
 import { DateProvider } from "@/contexts/date-context"
 import { CurrencyProvider } from "@/contexts/currency-context"
+import { DataProvider } from "@/contexts/data-context"
 
 export const metadata: Metadata = {
   title: "FinanceTracker - Personal Finance Management",
@@ -19,23 +21,26 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <head>
-        <style>{`
-html {
-  font-family: ${GeistSans.style.fontFamily};
-  --font-sans: ${GeistSans.variable};
-  --font-mono: ${GeistMono.variable};
-}
-        `}</style>
-      </head>
-      <body>
-        <ThemeProvider>
-          <CurrencyProvider>
-            <DateProvider>{children}</DateProvider>
-          </CurrencyProvider>
-        </ThemeProvider>
-      </body>
-    </html>
+    <ClerkProvider
+      afterSignInUrl="/"
+      afterSignUpUrl="/"
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+    >
+      <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} style={{ fontFamily: GeistSans.style.fontFamily }}>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        </head>
+        <body style={{ margin: 0, padding: 0 }}>
+          <ThemeProvider>
+            <CurrencyProvider>
+              <DateProvider>
+                <DataProvider>{children}</DataProvider>
+              </DateProvider>
+            </CurrencyProvider>
+          </ThemeProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }

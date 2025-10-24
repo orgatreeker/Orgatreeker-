@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -58,16 +57,14 @@ interface BudgetCategory {
 
 interface Transaction {
   id: string
-  description: string
+  category: string
+  subcategory: string
+  notes: string
   amount: number
   transaction_date: string
-  category_id: string
+  category_id?: string
   month: number
   year: number
-  budget_categories: {
-    name: string
-    type: string
-  }
 }
 
 export function DashboardContent({ user, profile }: DashboardContentProps) {
@@ -84,9 +81,7 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
     expenses: 0,
   })
   const router = useRouter()
-  const supabase = createClient()
-
-  const currentDate = new Date()
+    const currentDate = new Date()
   const currentYear = currentDate.getFullYear()
   const currentMonth = currentDate.getMonth() + 1
 
@@ -104,15 +99,9 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
 
   const fetchIncomeSources = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from("income_sources")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("month", currentMonth)
-        .eq("year", currentYear)
-
-      if (error) throw error
-      setIncomeSources(data || [])
+      const { getIncomeSources } = await import('@/lib/supabase/database')
+      const data = await getIncomeSources(userId, currentMonth, currentYear)
+      setIncomeSources(data)
     } catch (error) {
       console.error("Error fetching income sources:", error)
       setError("Failed to load income data")
@@ -121,15 +110,9 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
 
   const fetchBudgetData = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from("budget_categories")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("month", currentMonth)
-        .eq("year", currentYear)
-
-      if (error) throw error
-      setBudgetCategories(data || [])
+      const { getBudgetCategories } = await import('@/lib/supabase/database')
+      const data = await getBudgetCategories(userId, currentMonth, currentYear)
+      setBudgetCategories(data)
     } catch (error) {
       console.error("Error fetching budget data:", error)
       setError("Failed to load budget data")
@@ -138,25 +121,9 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
 
   const fetchTransactions = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select(
-          `
-          *,
-          budget_categories (
-            name,
-            type
-          )
-        `,
-        )
-        .eq("user_id", userId)
-        .eq("month", currentMonth)
-        .eq("year", currentYear)
-        .order("transaction_date", { ascending: false })
-        .limit(10)
-
-      if (error) throw error
-      setTransactions(data || [])
+      const { getTransactions } = await import('@/lib/supabase/database')
+      const data = await getTransactions(userId, currentMonth, currentYear)
+      setTransactions(data)
     } catch (error) {
       console.error("Error fetching transactions:", error)
       setError("Failed to load transactions")
@@ -165,48 +132,43 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
 
   const fetchHistoricalData = async (userId: string) => {
     try {
-      const [incomeData, transactionData] = await Promise.all([
-        supabase
-          .from("income_sources")
-          .select("amount, month, year")
-          .eq("user_id", userId)
-          .gte("year", currentYear - 1),
-        supabase
-          .from("transactions")
-          .select("amount, month, year")
-          .eq("user_id", userId)
-          .gte("year", currentYear - 1),
-      ])
-
-      if (incomeData.error) throw incomeData.error
-      if (transactionData.error) throw transactionData.error
-
-      // Group data by month-year
-      const incomeByMonth = (incomeData.data || []).reduce((acc: any, item) => {
-        const key = `${item.year}-${item.month}`
-        acc[key] = (acc[key] || 0) + item.amount
-        return acc
-      }, {})
-
-      const expensesByMonth = (transactionData.data || []).reduce((acc: any, item) => {
-        const key = `${item.year}-${item.month}`
-        acc[key] = (acc[key] || 0) + Math.abs(item.amount)
-        return acc
-      }, {})
-
-      // Create chart data for last 6 months
-      const chartData = []
+      const { getIncomeSources, getTransactions } = await import('@/lib/supabase/database')
+      
+      // Prepare all months to fetch
+      const monthsToFetch = []
       for (let i = 5; i >= 0; i--) {
         const date = new Date(currentYear, currentMonth - 1 - i, 1)
-        const key = `${date.getFullYear()}-${date.getMonth() + 1}`
-        chartData.push({
-          month: date.toLocaleDateString("en-US", { month: "short" }),
-          income: incomeByMonth[key] || 0,
-          expenses: expensesByMonth[key] || 0,
+        monthsToFetch.push({
+          date,
+          month: date.getMonth() + 1,
+          year: date.getFullYear()
         })
       }
-
-      setHistoricalData(chartData)
+      
+      // Fetch all months in parallel
+      const allResults = await Promise.all(
+        monthsToFetch.flatMap(({ month, year }) => [
+          getIncomeSources(userId, month, year),
+          getTransactions(userId, month, year)
+        ])
+      )
+      
+      // Process results
+      const historicalMonths = monthsToFetch.map((monthData, index) => {
+        const incomeData = allResults[index * 2]
+        const transactionData = allResults[index * 2 + 1]
+        
+        const income = incomeData.reduce((sum, item) => sum + item.amount, 0)
+        const expenses = transactionData.reduce((sum, item) => sum + Math.abs(item.amount), 0)
+        
+        return {
+          month: monthData.date.toLocaleDateString("en-US", { month: "short" }),
+          income,
+          expenses,
+        }
+      })
+      
+      setHistoricalData(historicalMonths)
     } catch (error) {
       console.error("Error fetching historical data:", error)
     }
@@ -214,30 +176,19 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
 
   const fetchPreviousMonthData = async (userId: string) => {
     try {
+      const { getIncomeSources, getTransactions } = await import('@/lib/supabase/database')
+      
       const prevDate = new Date(currentYear, currentMonth - 2, 1)
       const prevMonth = prevDate.getMonth() + 1
       const prevYear = prevDate.getFullYear()
 
       const [incomeData, transactionData] = await Promise.all([
-        supabase
-          .from("income_sources")
-          .select("amount")
-          .eq("user_id", userId)
-          .eq("month", prevMonth)
-          .eq("year", prevYear),
-        supabase
-          .from("transactions")
-          .select("amount")
-          .eq("user_id", userId)
-          .eq("month", prevMonth)
-          .eq("year", prevYear),
+        getIncomeSources(userId, prevMonth, prevYear),
+        getTransactions(userId, prevMonth, prevYear)
       ])
 
-      if (incomeData.error) throw incomeData.error
-      if (transactionData.error) throw transactionData.error
-
-      const prevIncome = (incomeData.data || []).reduce((sum, item) => sum + item.amount, 0)
-      const prevExpenses = (transactionData.data || []).reduce((sum, item) => sum + Math.abs(item.amount), 0)
+      const prevIncome = incomeData.reduce((sum, item) => sum + item.amount, 0)
+      const prevExpenses = transactionData.reduce((sum, item) => sum + Math.abs(item.amount), 0)
 
       setPreviousMonthData({ income: prevIncome, expenses: prevExpenses })
     } catch (error) {
@@ -277,7 +228,7 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
 
   const expensesByType = transactions.reduce(
     (acc, transaction) => {
-      const type = transaction.budget_categories?.type || "Other"
+      const type = transaction.category || "Other"
       acc[type] = (acc[type] || 0) + Math.abs(transaction.amount)
       return acc
     },
@@ -289,7 +240,7 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
       name: "Needs",
       value: totalSpent > 0 ? Math.round(((expensesByType.Needs || 0) / totalSpent) * 100) : 0,
       amount: expensesByType.Needs || 0,
-      color: "#3b82f6", // Blue-500
+      color: "#a855f7", // Purple-500
     },
     {
       name: "Wants",
@@ -298,10 +249,10 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
       color: "#06b6d4", // Cyan-500
     },
     {
-      name: "Savings",
-      value: totalSpent > 0 ? Math.round(((expensesByType.Savings || 0) / totalSpent) * 100) : 0,
-      amount: expensesByType.Savings || 0,
-      color: "#1e40af", // Blue-800
+      name: "Saving",
+      value: totalSpent > 0 ? Math.round(((expensesByType.Saving || 0) / totalSpent) * 100) : 0,
+      amount: expensesByType.Saving || 0,
+      color: "#10b981", // Green-500
     },
   ]
 
@@ -340,7 +291,7 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
               <span className="text-primary-foreground font-bold text-sm">FT</span>
             </div>
-            <h1 className="text-xl font-semibold">FinanceTracker</h1>
+            <h1 className="text-xl font-semibold">Hi, {getUserDisplayName()} 👋</h1>
           </div>
 
           <DropdownMenu>
@@ -596,7 +547,7 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Category</TableHead>
-                      <TableHead>Description</TableHead>
+                      <TableHead>Budget Category</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -607,9 +558,9 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
                           {new Date(transaction.transaction_date).toLocaleDateString()}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{transaction.budget_categories?.name || "Unknown"}</Badge>
+                          <Badge variant="outline">{transaction.category}</Badge>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">{transaction.description}</TableCell>
+                        <TableCell className="text-muted-foreground">{transaction.subcategory}</TableCell>
                         <TableCell className="text-right">
                           {transaction.amount < 0 ? (
                             <span className="text-red-600 font-medium">

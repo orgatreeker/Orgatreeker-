@@ -1,5 +1,3 @@
-import { createClient } from "@/lib/supabase/server"
-
 export interface Profile {
   id: string
   email: string | null
@@ -9,51 +7,16 @@ export interface Profile {
 }
 
 export async function getProfileServer(userId: string): Promise<Profile | null> {
-  const supabase = await createClient()
-
-  const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single()
-
-  if (error) {
-    console.error("Error fetching profile:", error)
-    return null
-  }
-
-  return data
+  console.warn("getProfileServer called but Supabase has been removed")
+  return null
 }
 
 export async function createProfileServer(userId: string, email: string, fullName?: string): Promise<Profile | null> {
-  const supabase = await createClient()
-
-  const profileData = {
-    id: userId,
-    email,
-    full_name: fullName || null,
-  }
-
-  const { data, error } = await supabase.from("profiles").insert(profileData).select().single()
-
-  if (error) {
-    console.error("Error creating profile:", error)
-    return null
-  }
-
-  return data
+  console.warn("createProfileServer called but Supabase has been removed")
+  return null
 }
 
 export async function updateProfileServer(userId: string, updates: Partial<Profile>): Promise<Profile | null> {
-  const supabase = await createClient()
-
-  const { data, error } = await supabase
-    .from("profiles")
-    .update({ ...updates, updated_at: new Date().toISOString() })
-    .eq("id", userId)
-    .select()
-    .single()
-
-  if (error) {
-    console.error("Error updating profile:", error)
-    return null
-  }
-
-  return data
+  console.warn("updateProfileServer called but Supabase has been removed")
+  return null
 }

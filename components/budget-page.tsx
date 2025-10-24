@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -34,17 +33,20 @@ import {
   Crown,
 } from "lucide-react"
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
-import { useRouter } from "next/navigation"
+import { useUser } from "@clerk/nextjs"
 import { MonthPicker } from "@/components/month-picker"
 import { useDateContext } from "@/contexts/date-context"
 import { useCurrency } from "@/contexts/currency-context"
+import { useData } from "@/contexts/data-context"
 
 interface Transaction {
   id: string
-  category_id: string
-  description: string
+  category: string
+  subcategory: string
+  notes: string
   amount: number
   transaction_date: string
+  category_id?: string
   month: number
   year: number
   created_at?: string
@@ -76,133 +78,62 @@ interface BudgetPageProps {
 }
 
 export function BudgetPage({ isPremium = false }: BudgetPageProps) {
-  const [categories, setCategories] = useState<BudgetCategory[]>([])
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([])
+  const {
+    budgetCategories: categories,
+    transactions,
+    incomeSources,
+    userSettings,
+    isLoading,
+    addBudgetCategory,
+    updateBudgetCategoryById,
+    deleteBudgetCategoryById,
+  } = useData()
+
   const [categoryFilter, setCategoryFilter] = useState<string>("All")
-  const [isLoading, setIsLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<BudgetCategory | null>(null)
   const [editingCategory, setEditingCategory] = useState<BudgetCategory | null>(null)
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [user, setUser] = useState<any>(null)
-  const router = useRouter()
+  const { user } = useUser()
   const { selectedDate, selectedYear, selectedMonthNumber } = useDateContext()
-  const { formatAmount } = useCurrency() // Added currency context for dynamic formatting
+  const { formatAmount } = useCurrency()
   const [formData, setFormData] = useState({
     name: "",
     budget: "",
     category: "",
   })
-  const [transactionFormData, setTransactionFormData] = useState({
-    description: "",
-    amount: "",
-    date: new Date().toISOString().split("T")[0],
-  })
-
-  const supabase = createClient()
-
-  useEffect(() => {
-    checkUser()
-  }, [])
-
-  useEffect(() => {
-    if (user) {
-      Promise.all([fetchBudgetCategories(user.id), fetchTransactions(user.id), fetchIncomeSources(user.id)])
-    }
-  }, [selectedYear, selectedMonthNumber, user])
-
-  const checkUser = async () => {
-    try {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser()
-      if (error) throw error
-
-      if (!user) {
-        router.push("/auth/login")
-        return
-      }
-
-      setUser(user)
-      await Promise.all([fetchBudgetCategories(user.id), fetchTransactions(user.id), fetchIncomeSources(user.id)])
-    } catch (error) {
-      console.error("Error checking user:", error)
-      router.push("/auth/login")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const fetchBudgetCategories = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("budget_categories")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("month", selectedMonthNumber)
-        .eq("year", selectedYear)
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-      setCategories(data || [])
-    } catch (error) {
-      console.error("Error fetching budget categories:", error)
-      setError("Failed to load budget categories")
-    }
-  }
-
-  const fetchTransactions = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("month", selectedMonthNumber)
-        .eq("year", selectedYear)
-        .order("transaction_date", { ascending: false })
-
-      if (error) throw error
-      setTransactions(data || [])
-    } catch (error) {
-      console.error("Error fetching transactions:", error)
-      setError("Failed to load transactions")
-    }
-  }
-
-  const fetchIncomeSources = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("income_sources")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("month", selectedMonthNumber)
-        .eq("year", selectedYear)
-
-      if (error) throw error
-      setIncomeSources(data || [])
-    } catch (error) {
-      console.error("Error fetching income sources:", error)
-    }
-  }
 
   const totalIncome = incomeSources.reduce((sum, source) => sum + source.amount, 0)
   const getTargetAmount = (percentage: number) => (totalIncome * percentage) / 100
 
   const getSpentAmount = (categoryId: string) => {
+    const category = categories.find(cat => cat.id === categoryId)
+    if (!category) return 0
+    
     return transactions
-      .filter((transaction) => transaction.category_id === categoryId)
-      .reduce((sum, transaction) => sum + transaction.amount, 0)
+      .filter((transaction) => transaction.subcategory === category.name)
+      .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0)
   }
 
   const getBudgetOverviewData = () => {
+    // Get custom percentages from user settings or use defaults
+    const needsPercentage = userSettings?.needs_percentage ?? 50
+    const wantsPercentage = userSettings?.wants_percentage ?? 30
+    const savingsPercentage = userSettings?.savings_percentage ?? 20
+
+    // Calculate total income
+    const totalIncome = incomeSources.reduce((sum, source) => sum + source.amount, 0)
+
+    // Calculate target amounts based on percentages
+    const needsTarget = (totalIncome * needsPercentage) / 100
+    const wantsTarget = (totalIncome * wantsPercentage) / 100
+    const savingsTarget = (totalIncome * savingsPercentage) / 100
+
     const needsCategories = categories.filter((cat) => cat.type === "Needs")
     const wantsCategories = categories.filter((cat) => cat.type === "Wants")
-    const savingsCategories = categories.filter((cat) => cat.type === "Savings")
+    const savingsCategories = categories.filter((cat) => cat.type === "Savings" || cat.type === "Saving")
 
     const needsBudgeted = needsCategories.reduce((sum, cat) => sum + cat.budgeted_amount, 0)
     const wantsBudgeted = wantsCategories.reduce((sum, cat) => sum + cat.budgeted_amount, 0)
@@ -213,9 +144,9 @@ export function BudgetPage({ isPremium = false }: BudgetPageProps) {
     const savingsSpent = savingsCategories.reduce((sum, cat) => sum + getSpentAmount(cat.id), 0)
 
     return [
-      { category: "Needs", budgeted: needsBudgeted, spent: needsSpent, percentage: 50, color: "#8b5cf6" },
-      { category: "Wants", budgeted: wantsBudgeted, spent: wantsSpent, percentage: 30, color: "#06b6d4" },
-      { category: "Savings", budgeted: savingsBudgeted, spent: savingsSpent, percentage: 20, color: "#10b981" },
+      { category: "Needs", budgeted: needsBudgeted, spent: needsSpent, percentage: needsPercentage, target: needsTarget, color: "#8b5cf6" },
+      { category: "Wants", budgeted: wantsBudgeted, spent: wantsSpent, percentage: wantsPercentage, target: wantsTarget, color: "#06b6d4" },
+      { category: "Saving", budgeted: savingsBudgeted, spent: savingsSpent, percentage: savingsPercentage, target: savingsTarget, color: "#10b981" },
     ]
   }
 
@@ -253,90 +184,22 @@ export function BudgetPage({ isPremium = false }: BudgetPageProps) {
     setIsDialogOpen(true)
   }
 
-  const handleOpenTransactionDialog = (category: BudgetCategory, transaction?: Transaction) => {
+  const handleOpenTransactionDialog = (category: BudgetCategory) => {
     if (!isPremium && category.type === "Savings") {
-      setError("Savings transactions are a Pro feature. Upgrade to Pro to manage savings.")
+      setError("Savings transactions are a Pro feature. Upgrade to Pro to view savings transactions.")
       return
     }
 
     setSelectedCategory(category)
-    if (transaction) {
-      setEditingTransaction(transaction)
-      setTransactionFormData({
-        description: transaction.description,
-        amount: transaction.amount.toString(),
-        date: transaction.transaction_date,
-      })
-    } else {
-      setEditingTransaction(null)
-      setTransactionFormData({
-        description: "",
-        amount: "",
-        date: new Date().toISOString().split("T")[0],
-      })
-    }
     setIsTransactionDialogOpen(true)
   }
 
-  const handleSaveTransaction = async () => {
-    if (!selectedCategory || !transactionFormData.description || !transactionFormData.amount || !user) return
 
-    setIsSaving(true)
-    setError(null)
 
-    try {
-      const transactionData = {
-        category_id: selectedCategory.id,
-        description: transactionFormData.description,
-        amount: Number.parseFloat(transactionFormData.amount),
-        transaction_date: transactionFormData.date,
-        month: selectedMonthNumber,
-        year: selectedYear,
-        user_id: user.id,
-      }
 
-      if (editingTransaction) {
-        const { error } = await supabase
-          .from("transactions")
-          .update(transactionData)
-          .eq("id", editingTransaction.id)
-          .eq("user_id", user.id)
-
-        if (error) throw error
-      } else {
-        const { error } = await supabase.from("transactions").insert([transactionData])
-
-        if (error) throw error
-      }
-
-      await fetchTransactions(user.id)
-      setIsTransactionDialogOpen(false)
-      setTransactionFormData({ description: "", amount: "", date: new Date().toISOString().split("T")[0] })
-      setEditingTransaction(null)
-    } catch (error) {
-      console.error("Error saving transaction:", error)
-      setError("Failed to save transaction")
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleDeleteTransaction = async (id: string) => {
-    if (!user) return
-
-    try {
-      const { error } = await supabase.from("transactions").delete().eq("id", id).eq("user_id", user.id)
-
-      if (error) throw error
-      await fetchTransactions(user.id)
-    } catch (error) {
-      console.error("Error deleting transaction:", error)
-      setError("Failed to delete transaction")
-    }
-  }
 
   const handleSaveCategory = async () => {
-    if (!formData.name || !formData.budget || !formData.category || !user) return
+    if (!formData.name || !formData.budget || !formData.category || !user?.id) return
 
     if (!isPremium && formData.category === "Savings") {
       setError("Savings category management is a Pro feature. Upgrade to Pro to create savings categories.")
@@ -353,24 +216,14 @@ export function BudgetPage({ isPremium = false }: BudgetPageProps) {
         type: formData.category,
         month: selectedMonthNumber,
         year: selectedYear,
-        user_id: user.id,
       }
 
       if (editingCategory) {
-        const { error } = await supabase
-          .from("budget_categories")
-          .update(categoryData)
-          .eq("id", editingCategory.id)
-          .eq("user_id", user.id)
-
-        if (error) throw error
+        await updateBudgetCategoryById(editingCategory.id, categoryData)
       } else {
-        const { error } = await supabase.from("budget_categories").insert([categoryData])
-
-        if (error) throw error
+        await addBudgetCategory(categoryData)
       }
 
-      await fetchBudgetCategories(user.id)
       setIsDialogOpen(false)
       setFormData({ name: "", budget: "", category: "" })
       setEditingCategory(null)
@@ -382,18 +235,16 @@ export function BudgetPage({ isPremium = false }: BudgetPageProps) {
     }
   }
 
-  const handleDeleteCategory = async (id: string) => {
-    if (!user) return
+  const handleDeleteCategory = async (id: string, categoryName: string) => {
+    // Confirmation dialog
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the "${categoryName}" category?\n\nThis will not delete associated transactions, but they will no longer be linked to this category.`
+    )
+
+    if (!confirmed) return
 
     try {
-      // First delete all transactions for this category
-      await supabase.from("transactions").delete().eq("category_id", id).eq("user_id", user.id)
-
-      // Then delete the category
-      const { error } = await supabase.from("budget_categories").delete().eq("id", id).eq("user_id", user.id)
-
-      if (error) throw error
-      await Promise.all([fetchBudgetCategories(user.id), fetchTransactions(user.id)])
+      await deleteBudgetCategoryById(id)
     } catch (error) {
       console.error("Error deleting category:", error)
       setError("Failed to delete category")
@@ -440,12 +291,11 @@ export function BudgetPage({ isPremium = false }: BudgetPageProps) {
         {budgetOverviewData.map((item) => {
           const progressPercentage = item.budgeted > 0 ? (item.spent / item.budgeted) * 100 : 0
           const remaining = item.budgeted - item.spent
-          const targetAmount = getTargetAmount(item.percentage)
-          const targetDifference = item.budgeted - targetAmount
+          const targetDifference = item.budgeted - item.target
 
           return (
-            <Card key={item.category} className={!isPremium && item.category === "Savings" ? "relative" : ""}>
-              {!isPremium && item.category === "Savings" && (
+            <Card key={item.category} className={!isPremium && item.category === "Saving" ? "relative" : ""}>
+              {!isPremium && item.category === "Saving" && (
                 <div className="absolute inset-0 bg-background/80 backdrop-blur-sm rounded-lg flex flex-col items-center justify-center z-10">
                   <Lock className="h-6 w-6 text-muted-foreground mb-2" />
                   <p className="text-sm font-medium text-center mb-2">Savings Locked</p>
@@ -459,16 +309,16 @@ export function BudgetPage({ isPremium = false }: BudgetPageProps) {
                 <CardTitle className="text-sm font-medium">{item.category}</CardTitle>
                 {item.category === "Needs" && <Target className="h-4 w-4 text-muted-foreground" />}
                 {item.category === "Wants" && <TrendingUp className="h-4 w-4 text-muted-foreground" />}
-                {item.category === "Savings" && <PiggyBank className="h-4 w-4 text-muted-foreground" />}
+                {item.category === "Saving" && <PiggyBank className="h-4 w-4 text-muted-foreground" />}
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="bg-muted/50 p-3 rounded-lg space-y-2">
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>50/30/20 Rule Target:</span>
-                    <span>{item.percentage}% of income</span>
+                    <span>Budget Target:</span>
+                    <span className="font-bold text-primary">{item.percentage}% of income</span>
                   </div>
                   <div className="flex justify-between text-sm font-medium">
-                    <span>Recommended: {formatAmount(targetAmount)}</span>
+                    <span>Target Amount: {formatAmount(item.target)}</span>
                     <span className={targetDifference >= 0 ? "text-green-600" : "text-orange-600"}>
                       {targetDifference >= 0 ? "+" : ""}
                       {formatAmount(targetDifference)}
@@ -493,120 +343,6 @@ export function BudgetPage({ isPremium = false }: BudgetPageProps) {
             </Card>
           )
         })}
-      </div>
-
-      {/* Charts Section */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Budget Allocation</CardTitle>
-            <CardDescription>
-              Distribution for {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {pieChartData.some((item) => item.value > 0) ? (
-              <>
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={pieChartData.filter((item) => item.value > 0)}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={5}
-                      dataKey="value"
-                      stroke="#ffffff"
-                      strokeWidth={2}
-                    >
-                      {pieChartData
-                        .filter((item) => item.value > 0)
-                        .map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value) => [formatAmount(Number(value)), "Amount"]}
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--background))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="flex justify-center space-x-4 mt-4">
-                  {pieChartData
-                    .filter((entry) => entry.value > 0)
-                    .map((entry, index) => (
-                      <div key={index} className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full shadow-sm" style={{ backgroundColor: entry.color }} />
-                        <span className="text-sm text-muted-foreground">
-                          {entry.name}: {formatAmount(entry.value)}
-                        </span>
-                      </div>
-                    ))}
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-                No budget data available for{" "}
-                {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Actual vs Budget</CardTitle>
-            <CardDescription>
-              Comparison for {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {barChartData.some((item) => item.budgeted > 0 || item.spent > 0) ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={barChartData} barGap={10}>
-                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis dataKey="category" axisLine={false} tickLine={false} className="text-muted-foreground" />
-                  <YAxis axisLine={false} tickLine={false} className="text-muted-foreground" />
-                  <Tooltip
-                    formatter={(value, name) => [formatAmount(Number(value)), name]}
-                    labelStyle={{ color: "hsl(var(--foreground))" }}
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--background))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                    }}
-                  />
-                  <Bar
-                    dataKey="budgeted"
-                    fill="#8b5cf6"
-                    name="Budgeted"
-                    radius={[4, 4, 0, 0]}
-                    filter="drop-shadow(0 2px 4px rgba(139, 92, 246, 0.2))"
-                  />
-                  <Bar
-                    dataKey="spent"
-                    fill="#f59e0b"
-                    name="Spent"
-                    radius={[4, 4, 0, 0]}
-                    filter="drop-shadow(0 2px 4px rgba(245, 158, 11, 0.2))"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
-                No budget data available for{" "}
-                {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
       {/* Category Management */}
@@ -740,7 +476,7 @@ export function BudgetPage({ isPremium = false }: BudgetPageProps) {
                 {filteredCategories.map((category) => {
                   const spent = getSpentAmount(category.id)
                   const remaining = category.budgeted_amount - spent
-                  const categoryTransactions = transactions.filter((t) => t.category_id === category.id)
+                  const categoryTransactions = transactions.filter((t) => t.subcategory === category.name)
 
                   return (
                     <TableRow key={category.id}>
@@ -775,33 +511,27 @@ export function BudgetPage({ isPremium = false }: BudgetPageProps) {
                           {!isPremium && category.type === "Savings" && <Lock className="ml-1 h-3 w-3" />}
                         </Button>
                       </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleOpenDialog(category)}
-                              disabled={!isPremium && category.type === "Savings"}
-                            >
-                              <Edit className="mr-2 h-4 w-4" />
-                              Edit
-                              {!isPremium && category.type === "Savings" && <Lock className="ml-2 h-3 w-3" />}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDeleteCategory(category.id)}
-                              className="text-destructive"
-                              disabled={!isPremium && category.type === "Savings"}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                              {!isPremium && category.type === "Savings" && <Lock className="ml-2 h-3 w-3" />}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleOpenDialog(category)}
+                            disabled={!isPremium && category.type === "Savings"}
+                            className="h-8 px-2 hover:bg-accent"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteCategory(category.id, category.name)}
+                            disabled={!isPremium && category.type === "Savings"}
+                            className="h-8 px-2 hover:bg-destructive/10 text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   )
@@ -812,105 +542,73 @@ export function BudgetPage({ isPremium = false }: BudgetPageProps) {
         </CardContent>
       </Card>
 
-      {/* Transaction Management Dialog */}
+      {/* Transaction View Dialog */}
       <Dialog open={isTransactionDialogOpen} onOpenChange={setIsTransactionDialogOpen}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>{selectedCategory?.name} Transactions</DialogTitle>
+            <DialogTitle>{selectedCategory?.name} - Transaction Summary</DialogTitle>
             <DialogDescription>
-              Manage transactions for this category in{" "}
+              Viewing transactions for this category in{" "}
               {selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}. Total spent:{" "}
               {formatAmount(selectedCategory ? getSpentAmount(selectedCategory.id) : 0)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Add Transaction Form */}
-            <div className="border rounded-lg p-4 space-y-3">
-              <h4 className="font-medium">{editingTransaction ? "Edit Transaction" : "Add New Transaction"}</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Input
-                    id="description"
-                    value={transactionFormData.description}
-                    onChange={(e) => setTransactionFormData({ ...transactionFormData, description: e.target.value })}
-                    placeholder="e.g., Weekly groceries"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="amount">Amount</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    value={transactionFormData.amount}
-                    onChange={(e) => setTransactionFormData({ ...transactionFormData, amount: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
+            {/* Info Message */}
+            <div className="bg-muted/50 border rounded-lg p-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <Receipt className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm font-medium">These are transactions from the Transactions tab</p>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label htmlFor="date">Date</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={transactionFormData.date}
-                    onChange={(e) => setTransactionFormData({ ...transactionFormData, date: e.target.value })}
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button onClick={handleSaveTransaction} className="w-full" disabled={isSaving}>
-                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {editingTransaction ? "Update" : "Add"} Transaction
-                  </Button>
-                </div>
-              </div>
+              <p className="text-xs text-muted-foreground">
+                To add, edit, or delete transactions, click the <strong>Transactions</strong> tab in the navigation and create a transaction with this category name (<strong>{selectedCategory?.name}</strong>) as the subcategory.
+              </p>
             </div>
 
             {/* Transactions List */}
-            <div className="max-h-[300px] overflow-y-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="w-[100px]"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedCategory &&
-                    transactions
-                      .filter((transaction) => transaction.category_id === selectedCategory.id)
-                      .sort((a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime())
-                      .map((transaction) => (
-                        <TableRow key={transaction.id}>
-                          <TableCell className="font-medium">{transaction.description}</TableCell>
-                          <TableCell>{new Date(transaction.transaction_date).toLocaleDateString()}</TableCell>
-                          <TableCell className="text-right">{formatAmount(transaction.amount)}</TableCell>
-                          <TableCell>
-                            <div className="flex space-x-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleOpenTransactionDialog(selectedCategory, transaction)}
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteTransaction(transaction.id)}
-                                className="text-destructive"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                </TableBody>
-              </Table>
+            <div className="max-h-[400px] overflow-y-auto">
+              {selectedCategory && transactions.filter((transaction) => transaction.subcategory === selectedCategory.name).length === 0 ? (
+                <div className="text-center py-8">
+                  <Receipt className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <p className="text-muted-foreground">No transactions recorded for this category</p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Add transactions in the Transactions tab
+                  </p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedCategory &&
+                      transactions
+                        .filter((transaction) => transaction.subcategory === selectedCategory.name)
+                        .sort((a, b) => new Date(b.transaction_date).getTime() - new Date(a.transaction_date).getTime())
+                        .map((transaction) => (
+                          <TableRow key={transaction.id}>
+                            <TableCell className="font-medium">
+                              {new Date(transaction.transaction_date).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{transaction.category}</Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground max-w-[200px] truncate">
+                              {transaction.notes || "-"}
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatAmount(Math.abs(transaction.amount))}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                  </TableBody>
+                </Table>
+              )}
             </div>
           </div>
         </DialogContent>

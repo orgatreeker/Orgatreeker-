@@ -1,21 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useState } from "react"
+import Link from "next/link"
+import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton, useUser } from "@clerk/nextjs"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { User, CreditCard, Menu } from "lucide-react"
-import { LogoutButton } from "@/components/logout-button"
-import { getProfile, createProfile, type Profile } from "@/lib/profile-utils"
+import { Menu } from "lucide-react"
 
 interface NavigationProps {
   activeTab: string
@@ -23,117 +14,53 @@ interface NavigationProps {
 }
 
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {
-  const [user, setUser] = useState<any>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const supabase = createClient()
-
-  useEffect(() => {
-    const getUser = async () => {
-      try {
-        const {
-          data: { user },
-          error,
-        } = await supabase.auth.getUser()
-
-        if (error) {
-          console.error("Error getting user:", error)
-          return
-        }
-
-        setUser(user)
-
-        if (user) {
-          let profileData = await getProfile(user.id)
-
-          if (!profileData) {
-            const fullName =
-              user.user_metadata?.full_name ||
-              user.user_metadata?.name ||
-              `${user.user_metadata?.first_name || ""} ${user.user_metadata?.last_name || ""}`.trim()
-
-            profileData = await createProfile(user.id, user.email || "", fullName)
-          }
-
-          setProfile(profileData)
-        }
-      } catch (error) {
-        console.error("Error in getUser:", error)
-      }
-    }
-
-    getUser()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_OUT") {
-        setUser(null)
-        setProfile(null)
-      } else if (event === "SIGNED_IN" && session?.user) {
-        setUser(session.user)
-
-        let profileData = await getProfile(session.user.id)
-
-        if (!profileData) {
-          const fullName =
-            session.user.user_metadata?.full_name ||
-            session.user.user_metadata?.name ||
-            `${session.user.user_metadata?.first_name || ""} ${session.user.user_metadata?.last_name || ""}`.trim()
-
-          profileData = await createProfile(session.user.id, session.user.email || "", fullName)
-        }
-
-        setProfile(profileData)
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [supabase.auth])
-
-  const getUserInitials = () => {
-    if (!user) return "U"
-    const name = profile?.full_name || user.user_metadata?.full_name || user.user_metadata?.name || user.email || ""
-    return name
-      .split(" ")
-      .map((n: string) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
-  }
-
-  const getUserDisplayName = () => {
-    return profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || "User"
-  }
+  const { user } = useUser()
 
   const handleTabChange = (tab: string) => {
     onTabChange(tab)
-    setIsMobileMenuOpen(false) // Close mobile menu when tab changes
+    setIsMobileMenuOpen(false)
+  }
+
+  const getUserName = () => {
+    if (!user) return "Guest"
+    return user.firstName || user.fullName || user.username || "User"
   }
 
   const navigationItems = [
     { value: "dashboard", label: "Dashboard" },
     { value: "income", label: "Income" },
     { value: "budget", label: "Budget" },
+    { value: "transactions", label: "Transactions" },
     { value: "settings", label: "Settings" },
   ]
 
   return (
     <nav className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
       <div className="flex h-14 md:h-16 items-center justify-between px-4 md:px-6">
-        {/* Logo and Brand */}
+        {/* Logo and Greeting */}
         <div className="flex items-center space-x-2 md:space-x-4">
           <div className="h-6 w-6 md:h-8 md:w-8 rounded-lg bg-primary flex items-center justify-center">
             <span className="text-primary-foreground font-bold text-xs md:text-sm">FT</span>
           </div>
-          <span className="font-semibold text-base md:text-lg hidden sm:block">FinanceTracker</span>
-          <span className="font-semibold text-base md:text-lg sm:hidden">FT</span>
+          <SignedIn>
+            <span className="font-semibold text-base md:text-lg hidden sm:block">
+              Hi, {getUserName()} 👋
+            </span>
+            <span className="font-semibold text-base md:text-lg sm:hidden">
+              Hi, {getUserName()}
+            </span>
+          </SignedIn>
+          <SignedOut>
+            <span className="font-semibold text-base md:text-lg hidden sm:block">FinanceTracker</span>
+            <span className="font-semibold text-base md:text-lg sm:hidden">FT</span>
+          </SignedOut>
         </div>
 
         {/* Desktop Navigation Tabs - Hidden on mobile */}
-        <div className="hidden md:flex flex-1 max-w-md mx-8">
+        <div className="hidden md:flex flex-1 max-w-2xl mx-8">
           <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               {navigationItems.map((item) => (
                 <TabsTrigger key={item.value} value={item.value} className="text-xs lg:text-sm">
                   {item.label}
@@ -141,6 +68,28 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
               ))}
             </TabsList>
           </Tabs>
+        </div>
+
+        {/* Auth Buttons - Desktop */}
+        <div className="hidden md:flex items-center gap-3">
+          {/* Pricing is visible to both signed-in and signed-out users */}
+          <Link href="/pricing">
+            <Button variant="ghost" size="sm">Pricing</Button>
+          </Link>
+
+          <SignedOut>
+            <SignInButton mode="redirect">
+              <Button variant="ghost" size="sm">
+                Sign In
+              </Button>
+            </SignInButton>
+            <SignUpButton mode="redirect">
+              <Button size="sm">Sign Up</Button>
+            </SignUpButton>
+          </SignedOut>
+          <SignedIn>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
         </div>
 
         {/* Mobile Menu Button - Visible on mobile only */}
@@ -158,7 +107,12 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                   <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
                     <span className="text-primary-foreground font-bold text-sm">FT</span>
                   </div>
-                  <span className="font-semibold text-lg">FinanceTracker</span>
+                  <SignedIn>
+                    <span className="font-semibold text-lg">Hi, {getUserName()} 👋</span>
+                  </SignedIn>
+                  <SignedOut>
+                    <span className="font-semibold text-lg">FinanceTracker</span>
+                  </SignedOut>
                 </div>
 
                 {/* Mobile Navigation Items */}
@@ -173,62 +127,35 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                       {item.label}
                     </Button>
                   ))}
+
+                  {/* Link to Pricing page */}
+                  <Button asChild variant="ghost" className="w-full justify-start">
+                    <Link href="/pricing">Pricing</Link>
+                  </Button>
                 </div>
 
-                {/* Mobile User Info */}
-                {user && (
-                  <div className="pt-4 border-t space-y-2">
-                    <div className="flex items-center space-x-2 p-2">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src="/placeholder.svg?height=32&width=32" alt="Profile" />
-                        <AvatarFallback className="text-xs">{getUserInitials()}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col">
-                        <p className="text-sm font-medium leading-none">{getUserDisplayName()}</p>
-                        <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-                      </div>
+                {/* Mobile Auth Section */}
+                <div className="pt-4 border-t space-y-2">
+                  <SignedOut>
+                    <SignInButton mode="redirect">
+                      <Button variant="outline" className="w-full">
+                        Sign In
+                      </Button>
+                    </SignInButton>
+                    <SignUpButton mode="redirect">
+                      <Button className="w-full">Sign Up</Button>
+                    </SignUpButton>
+                  </SignedOut>
+                  <SignedIn>
+                    <div className="flex items-center justify-between p-2">
+                      <span className="text-sm font-medium">Account</span>
+                      <UserButton afterSignOutUrl="/" />
                     </div>
-                    <LogoutButton className="w-full justify-start text-destructive" />
-                  </div>
-                )}
+                  </SignedIn>
+                </div>
               </div>
             </SheetContent>
           </Sheet>
-        </div>
-
-        {/* Desktop Profile Dropdown - Hidden on mobile */}
-        <div className="hidden md:block">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-8 w-8 md:h-10 md:w-10 rounded-full">
-                <Avatar className="h-8 w-8 md:h-10 md:w-10">
-                  <AvatarImage src="/placeholder.svg?height=40&width=40" alt="Profile" />
-                  <AvatarFallback className="text-xs md:text-sm">{getUserInitials()}</AvatarFallback>
-                </Avatar>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
-              {user && (
-                <>
-                  <div className="flex flex-col space-y-1 p-2">
-                    <p className="text-sm font-medium leading-none">{getUserDisplayName()}</p>
-                    <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-                  </div>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-              <DropdownMenuItem>
-                <User className="mr-2 h-4 w-4" />
-                <span>Account</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <CreditCard className="mr-2 h-4 w-4" />
-                <span>Billing</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <LogoutButton variant="dropdown" />
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
     </nav>

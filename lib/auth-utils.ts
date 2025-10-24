@@ -1,5 +1,3 @@
-import { createClient } from "@/lib/supabase/client"
-
 export interface LogoutOptions {
   redirectTo?: string
   onSuccess?: () => void
@@ -7,37 +5,19 @@ export interface LogoutOptions {
 }
 
 export async function logout(options: LogoutOptions = {}) {
-  const { redirectTo = "/auth/login", onSuccess, onError } = options
-  const supabase = createClient()
+  const { redirectTo = "/auth/login", onSuccess } = options
 
-  try {
-    const { error } = await supabase.auth.signOut()
+  // Clear any local storage or session data if needed
+  if (typeof window !== "undefined") {
+    localStorage.clear()
+    sessionStorage.clear()
+  }
 
-    if (error) {
-      throw error
-    }
+  onSuccess?.()
 
-    // Clear any local storage or session data if needed
-    if (typeof window !== "undefined") {
-      // Clear any cached data
-      localStorage.removeItem("supabase.auth.token")
-      sessionStorage.clear()
-    }
-
-    onSuccess?.()
-
-    // Redirect to login page
-    if (typeof window !== "undefined") {
-      window.location.href = redirectTo
-    }
-  } catch (error) {
-    console.error("Error during logout:", error)
-    onError?.(error as Error)
-
-    // Still redirect to login even if logout fails
-    if (typeof window !== "undefined") {
-      window.location.href = redirectTo
-    }
+  // Redirect to login page
+  if (typeof window !== "undefined") {
+    window.location.href = redirectTo
   }
 }
 

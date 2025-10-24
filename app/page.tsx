@@ -1,126 +1,118 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useUser } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
 import { Navigation } from "@/components/navigation"
 import { DashboardPage } from "@/components/dashboard-page"
 import { IncomePage } from "@/components/income-page"
 import { BudgetPage } from "@/components/budget-page"
+import { TransactionsPage } from "@/components/transactions-page"
 import { SettingsPage } from "@/components/settings-page"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function AppPage() {
   const [activeTab, setActiveTab] = useState("dashboard")
-  const [isLoading, setIsLoading] = useState(true)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [user, setUser] = useState<any>(null)
+  const [loadedTabs, setLoadedTabs] = useState<Set<string>>(new Set(["dashboard"]))
+  const { isLoaded, isSignedIn, user } = useUser()
   const router = useRouter()
-  const supabase = createClient()
 
+  // Track which tabs have been visited to enable lazy loading
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.getSession()
+    setLoadedTabs(prev => new Set(prev).add(activeTab))
+  }, [activeTab])
 
-        if (error) {
-          console.error("Auth error:", error)
-          router.push("/auth")
-          return
-        }
+  // Check subscription status and redirect to pricing if not subscribed
+  useEffect(() => {
+    if (isLoaded && isSignedIn && user) {
+      const metadata = user.publicMetadata as any;
+      const subscription = metadata?.subscription;
 
-        if (!session) {
-          router.push("/auth")
-          return
-        }
+      // Check if user has an active subscription
+      const isActive = subscription?.status === 'active' || subscription?.status === 'trialing';
 
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", session.user.id)
-          .single()
-
-        if (profileError && profileError.code === "PGRST116") {
-          const { error: insertError } = await supabase.from("profiles").insert({
-            id: session.user.id,
-            email: session.user.email,
-            full_name:
-              session.user.user_metadata?.full_name ||
-              session.user.user_metadata?.name ||
-              `${session.user.user_metadata?.first_name || ""} ${session.user.user_metadata?.last_name || ""}`.trim() ||
-              "",
-          })
-
-          if (insertError) {
-            console.error("Error creating profile:", insertError)
-          }
-        }
-
-        setUser(session.user)
-        setIsAuthenticated(true)
-      } catch (error) {
-        console.error("Error checking auth:", error)
-        router.push("/auth")
-      } finally {
-        setIsLoading(false)
+      if (!isActive) {
+        // Redirect to pricing page if no active subscription
+        router.push('/pricing');
       }
     }
+  }, [isLoaded, isSignedIn, user, router])
 
-    checkAuth()
+  // Keep visited tabs mounted for smooth transitions and state preservation
+  const renderAllTabs = () => {
+    const isTabActive = (tab: string) => activeTab === tab ? "block" : "hidden"
+    const tabAnimation = "transition-opacity duration-200 ease-in-out"
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_OUT" || !session) {
-        setIsAuthenticated(false)
-        setUser(null)
-        router.push("/auth")
-      } else if (event === "SIGNED_IN" && session) {
-        setUser(session.user)
-        setIsAuthenticated(true)
-      }
-    })
-
-    return () => subscription.unsubscribe()
-  }, [router, supabase.auth])
-
-  if (isLoading) {
+    // Check subscription status from Clerk metadata
+    const metadata = user?.publicMetadata as any;
+    const subscription = metadata?.subscription;
+    const isPremium = subscription?.status === 'active' || subscription?.status === 'trialing'
+    
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground text-sm md:text-base">Loading...</p>
+      <>
+        <div className={`${isTabActive("dashboard")} ${tabAnimation}`}>
+          {loadedTabs.has("dashboard") && <DashboardPage isPremium={isPremium} />}
         </div>
+        <div className={`${isTabActive("income")} ${tabAnimation}`}>
+          {loadedTabs.has("income") && <IncomePage isPremium={isPremium} />}
+        </div>
+        <div className={`${isTabActive("budget")} ${tabAnimation}`}>
+          {loadedTabs.has("budget") && <BudgetPage isPremium={isPremium} />}
+        </div>
+        <div className={`${isTabActive("transactions")} ${tabAnimation}`}>
+          {loadedTabs.has("transactions") && <TransactionsPage />}
+        </div>
+        <div className={`${isTabActive("settings")} ${tabAnimation}`}>
+          {loadedTabs.has("settings") && <SettingsPage />}
+        </div>
+      </>
+    )
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+        <main className="container mx-auto px-4 py-4 md:px-6 md:py-8 max-w-7xl flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading...</p>
+          </div>
+        </main>
       </div>
     )
   }
 
-  if (!isAuthenticated) {
-    return null // Will redirect to auth
-  }
-
-  const renderContent = () => {
-    switch (activeTab) {
-      case "dashboard":
-        return <DashboardPage isPremium={false} />
-      case "income":
-        return <IncomePage isPremium={false} />
-      case "budget":
-        return <BudgetPage isPremium={false} />
-      case "settings":
-        return <SettingsPage />
-      default:
-        return <DashboardPage isPremium={false} />
-    }
+  if (!isSignedIn) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
+        <main className="container mx-auto px-4 py-4 md:px-6 md:py-8 max-w-7xl">
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <Card className="w-full max-w-md">
+              <CardHeader>
+                <CardTitle>Welcome to FinanceTracker</CardTitle>
+                <CardDescription>
+                  Sign in to manage your finances, track income and expenses, and create budgets.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Click "Sign In" or "Sign Up" in the navigation to get started.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </main>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-background">
       <Navigation activeTab={activeTab} onTabChange={setActiveTab} />
       <main className="container mx-auto px-4 py-4 md:px-6 md:py-8 max-w-7xl">
-        <div className="w-full">{renderContent()}</div>
+        <div className="w-full">{renderAllTabs()}</div>
       </main>
     </div>
   )

@@ -2,6 +2,8 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
+import { useUser } from "@clerk/nextjs"
+import { getUserSettings, createOrUpdateUserSettings } from "@/lib/supabase/database"
 
 export interface Currency {
   code: string
@@ -99,24 +101,53 @@ interface CurrencyContextType {
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined)
 
 export function CurrencyProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useUser()
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(
     CURRENCIES.find((c) => c.code === "USD") || CURRENCIES[0],
   )
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Load saved currency from localStorage on mount
+  // Load saved currency from database on mount
   useEffect(() => {
-    const savedCurrency = localStorage.getItem("selectedCurrency")
-    if (savedCurrency) {
-      const currency = CURRENCIES.find((c) => c.code === savedCurrency)
-      if (currency) {
-        setSelectedCurrency(currency)
+    const loadCurrencySettings = async () => {
+      if (!user?.id) {
+        setIsLoading(false)
+        return
+      }
+
+      try {
+        const settings = await getUserSettings(user.id)
+        if (settings && settings.currency_code) {
+          const currency = CURRENCIES.find((c) => c.code === settings.currency_code)
+          if (currency) {
+            setSelectedCurrency(currency)
+          }
+        }
+      } catch (error) {
+        console.error('Error loading currency settings:', error)
+      } finally {
+        setIsLoading(false)
       }
     }
-  }, [])
 
-  const setCurrency = (currency: Currency) => {
+    loadCurrencySettings()
+  }, [user?.id])
+
+  const setCurrency = async (currency: Currency) => {
     setSelectedCurrency(currency)
-    localStorage.setItem("selectedCurrency", currency.code)
+
+    // Save to database if user is logged in
+    if (user?.id) {
+      try {
+        await createOrUpdateUserSettings(user.id, {
+          currency_code: currency.code,
+          currency_symbol: currency.symbol,
+          currency_name: currency.name,
+        })
+      } catch (error) {
+        console.error('Error saving currency settings:', error)
+      }
+    }
   }
 
   const formatAmount = (amount: number): string => {

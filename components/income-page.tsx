@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -20,11 +19,12 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Plus, MoreHorizontal, Edit, Trash2, DollarSign, TrendingUp, Loader2, Lock, Crown } from "lucide-react"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 import { useRouter } from "next/navigation"
+import { useUser } from "@clerk/nextjs"
 import { useDateContext } from "@/contexts/date-context"
 import { useCurrency } from "@/contexts/currency-context"
-import { MonthPicker } from "@/components/month-picker" // Import MonthPicker component
+import { useData } from "@/contexts/data-context"
+import { MonthPicker } from "@/components/month-picker"
 
 interface IncomeSource {
   id: string
@@ -42,14 +42,19 @@ interface IncomePageProps {
 }
 
 export function IncomePage({ isPremium = false }: IncomePageProps) {
-  const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const {
+    incomeSources,
+    isLoading,
+    addIncomeSource,
+    updateIncomeSourceById,
+    deleteIncomeSourceById,
+  } = useData()
+
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingSource, setEditingSource] = useState<IncomeSource | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [user, setUser] = useState<any>(null)
-  const [historicalData, setHistoricalData] = useState<any[]>([])
+  const { user } = useUser()
   const router = useRouter()
   const { selectedDate, selectedYear, selectedMonthNumber } = useDateContext()
   const { formatAmount } = useCurrency()
@@ -58,101 +63,6 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
     category: "",
     amount: "",
   })
-
-  const supabase = createClient()
-
-  useEffect(() => {
-    checkUser()
-  }, [])
-
-  useEffect(() => {
-    if (user) {
-      fetchIncomeSources(user.id)
-      fetchHistoricalData(user.id)
-    }
-  }, [selectedYear, selectedMonthNumber, user])
-
-  const checkUser = async () => {
-    try {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser()
-      if (error) throw error
-
-      if (!user) {
-        router.push("/auth/login")
-        return
-      }
-
-      setUser(user)
-      await fetchIncomeSources(user.id)
-      await fetchHistoricalData(user.id)
-    } catch (error) {
-      console.error("Error checking user:", error)
-      router.push("/auth/login")
-    }
-  }
-
-  const fetchIncomeSources = async (userId: string) => {
-    try {
-      setIsLoading(true)
-      const { data, error } = await supabase
-        .from("income_sources")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("month", selectedMonthNumber)
-        .eq("year", selectedYear)
-        .order("created_at", { ascending: false })
-
-      if (error) throw error
-      setIncomeSources(data || [])
-    } catch (error) {
-      console.error("Error fetching income sources:", error)
-      setError("Failed to load income sources")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const fetchHistoricalData = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("income_sources")
-        .select("amount, month, year")
-        .eq("user_id", userId)
-        .gte("year", selectedYear - 1)
-        .order("year", { ascending: true })
-        .order("month", { ascending: true })
-
-      if (error) throw error
-
-      const groupedData = (data || []).reduce((acc: any, item) => {
-        const key = `${item.year}-${item.month}`
-        if (!acc[key]) {
-          acc[key] = {
-            month: new Date(item.year, item.month - 1).toLocaleDateString("en-US", { month: "short" }),
-            year: item.year,
-            monthNum: item.month,
-            income: 0,
-          }
-        }
-        acc[key].income += item.amount
-        return acc
-      }, {})
-
-      const chartData = Object.values(groupedData)
-        .sort((a: any, b: any) => {
-          if (a.year !== b.year) return a.year - b.year
-          return a.monthNum - b.monthNum
-        })
-        .slice(-7)
-
-      setHistoricalData(chartData)
-    } catch (error) {
-      console.error("Error fetching historical data:", error)
-    }
-  }
 
   const totalMonthlyIncome = incomeSources.reduce((sum, source) => sum + source.amount, 0)
 
@@ -177,7 +87,7 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
   }
 
   const handleSaveSource = async () => {
-    if (!formData.name || !formData.category || !formData.amount || !user) return
+    if (!formData.name || !formData.category || !formData.amount || !user?.id) return
 
     if (!editingSource && !isPremium && incomeSources.length >= 5) {
       setError("Free users can only add up to 5 income sources. Upgrade to Pro for unlimited income sources.")
@@ -189,30 +99,20 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
 
     try {
       const sourceData = {
+        clerk_user_id: user.id,
         name: formData.name,
         category: formData.category,
         amount: Number.parseFloat(formData.amount),
         month: selectedMonthNumber,
         year: selectedYear,
-        user_id: user.id,
       }
 
       if (editingSource) {
-        const { error } = await supabase
-          .from("income_sources")
-          .update(sourceData)
-          .eq("id", editingSource.id)
-          .eq("user_id", user.id)
-
-        if (error) throw error
+        await updateIncomeSourceById(editingSource.id, sourceData)
       } else {
-        const { error } = await supabase.from("income_sources").insert([sourceData])
-
-        if (error) throw error
+        await addIncomeSource(sourceData)
       }
 
-      await fetchIncomeSources(user.id)
-      await fetchHistoricalData(user.id)
       setIsDialogOpen(false)
       setFormData({ name: "", category: "", amount: "" })
       setEditingSource(null)
@@ -224,15 +124,16 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
     }
   }
 
-  const handleDeleteSource = async (id: string) => {
-    if (!user) return
+  const handleDeleteSource = async (id: string, sourceName: string) => {
+    // Confirmation dialog
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${sourceName}"?\n\nThis action cannot be undone.`
+    )
+
+    if (!confirmed) return
 
     try {
-      const { error } = await supabase.from("income_sources").delete().eq("id", id).eq("user_id", user.id)
-
-      if (error) throw error
-      await fetchIncomeSources(user.id)
-      await fetchHistoricalData(user.id)
+      await deleteIncomeSourceById(id)
     } catch (error) {
       console.error("Error deleting income source:", error)
       setError("Failed to delete income source")
@@ -382,54 +283,6 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Income Growth Trend</CardTitle>
-          <CardDescription>Monthly income progression over time</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={historicalData}>
-              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-              <XAxis dataKey="month" axisLine={false} tickLine={false} className="text-muted-foreground" />
-              <YAxis axisLine={false} tickLine={false} className="text-muted-foreground" />
-              <Tooltip
-                formatter={(value) => [formatAmount(Number(value)), "Monthly Income"]}
-                labelStyle={{ color: "hsl(var(--foreground))" }}
-                contentStyle={{
-                  backgroundColor: "hsl(var(--background))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
-                }}
-              />
-              <Line
-                type="monotone"
-                dataKey="income"
-                stroke="#10b981"
-                strokeWidth={3}
-                dot={{
-                  fill: "#10b981",
-                  strokeWidth: 3,
-                  r: 5,
-                  stroke: "#ffffff",
-                  strokeOpacity: 0.8,
-                }}
-                activeDot={{
-                  r: 7,
-                  fill: "#10b981",
-                  stroke: "#ffffff",
-                  strokeWidth: 2,
-                  filter: "drop-shadow(0 2px 4px rgba(16, 185, 129, 0.4))",
-                }}
-                name="Monthly Income"
-                filter="drop-shadow(0 2px 4px rgba(16, 185, 129, 0.2))"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
           <CardTitle>Income Sources</CardTitle>
           <CardDescription>
             Manage your income sources for{" "}
@@ -469,24 +322,25 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
                       <Badge variant="outline">{source.category}</Badge>
                     </TableCell>
                     <TableCell className="text-right font-medium">{formatAmount(source.amount)}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleOpenDialog(source)}>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteSource(source.id)} className="text-destructive">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenDialog(source)}
+                          className="h-8 px-2 hover:bg-accent"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteSource(source.id, source.name)}
+                          className="h-8 px-2 hover:bg-destructive/10 text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
