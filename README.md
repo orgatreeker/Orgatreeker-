@@ -48,10 +48,11 @@ What’s included
 Environment variables
 Copy `.env.local.example` to `.env.local` and set values:
 - `DODO_BEARER_TOKEN` — your Dodo Payments API token
-- `DEFAULT_RETURN_URL` — where users are sent after checkout (e.g. http://localhost:3000/)
-- `NEXT_PUBLIC_DODO_PRODUCT_BASIC` — Product ID for Basic plan
-- `NEXT_PUBLIC_DODO_PRODUCT_PRO` — Product ID for Pro plan
-- `NEXT_PUBLIC_DODO_PRODUCT_ENTERPRISE` — Product ID for Enterprise plan (optional)
+- `DEFAULT_RETURN_URL` — where users are sent after checkout
+  - Local: `http://localhost:3000/success`
+  - Production: `https://app.orgatreeker.com/success`
+- `NEXT_PUBLIC_DODO_PRODUCT_MONTHLY` — Product ID for Monthly plan
+- `NEXT_PUBLIC_DODO_PRODUCT_YEARLY` — Product ID for Yearly plan
 
 Local testing
 1) Install dependencies if needed:
