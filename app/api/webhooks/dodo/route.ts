@@ -51,8 +51,23 @@ export async function POST(req: NextRequest) {
         "svix-signature": svixSignature,
       }) as any;
     } catch (err) {
-      console.error("Webhook signature verification failed:", err);
-      return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+      console.error("❌ Webhook signature verification failed!");
+      console.error("Error details:", err);
+      console.error("Secret being used (first 10 chars):", webhookSecret.substring(0, 10) + "...");
+      console.error("Svix ID:", svixId);
+      console.error("Svix Timestamp:", svixTimestamp);
+      console.error("Svix Signature (first 20 chars):", svixSignature?.substring(0, 20) + "...");
+      console.error("");
+      console.error("🔧 TO FIX:");
+      console.error("1. Go to Dodo Dashboard → Webhooks");
+      console.error("2. Copy the Signing Secret");
+      console.error("3. Update DODO_WEBHOOK_SECRET in Vercel env vars");
+      console.error("4. Redeploy the app");
+      console.error("");
+      return NextResponse.json({
+        error: "Invalid signature",
+        hint: "Check DODO_WEBHOOK_SECRET in Vercel matches Dodo Dashboard"
+      }, { status: 400 });
     }
 
     // Basic routing by type/payload_type (examples taken from docs listings)
