@@ -6,7 +6,8 @@ I've set up your new Dodo Payments webhook with the updated configuration:
 
 ### **New Webhook Details:**
 - **URL:** `https://app.orgatreeker.com/webhook` ← **IMPORTANT: Use app. subdomain!**
-- **Signing Secret:** `whsec_3NJTaOxYLlAdVcsZo/jFWV4UpO07+mPj`
+- **Signing Secret:** `whsec_CiZ71O5wJSN6lz73RCpR9Kr/0q0F8F3d` ← **UPDATED!**
+- **Svix Play URL (Testing):** `https://play.svix.com/in/e_OxgBBYUmNx8XOCqDfBPBU9KDtSR/`
 - **Headers:** Dodo sends `webhook-id`, `webhook-signature`, `webhook-timestamp` (not `svix-*`)
 
 ---
@@ -21,8 +22,7 @@ I've set up your new Dodo Payments webhook with the updated configuration:
 ### 2. **Environment Variable Updated**
 - File: `.env.local` (local development)
 - Updated `DODO_WEBHOOK_SECRET` to new value
-- Old: `whsec_ko62zyrTktRwLxwxL+au3X2NOk0E6Iqe`
-- New: `whsec_3NJTaOxYLlAdVcsZo/jFWV4UpO07+mPj`
+- **Current:** `whsec_CiZ71O5wJSN6lz73RCpR9Kr/0q0F8F3d`
 
 ### 3. **Middleware Updated**
 - File: [middleware.ts](middleware.ts)
@@ -41,7 +41,7 @@ This is **CRITICAL** - Vercel (production) needs the new webhook secret:
 2. Click your project → **Settings** → **Environment Variables**
 3. Find `DODO_WEBHOOK_SECRET`
 4. Click **Edit** (pencil icon)
-5. Replace with new value: `whsec_3NJTaOxYLlAdVcsZo/jFWV4UpO07+mPj`
+5. Replace with new value: `whsec_CiZ71O5wJSN6lz73RCpR9Kr/0q0F8F3d`
 6. Make sure it's set for **Production** environment
 7. Click **Save**
 
@@ -86,8 +86,9 @@ Make sure your Dodo webhook is set up correctly:
 
 ### **Dodo Dashboard Settings:**
 
-1. **Webhook URL:** `https://app.orgatreeker.com/webhook` ← **Use app. subdomain!**
-2. **Signing Secret:** `whsec_3NJTaOxYLlAdVcsZo/jFWV4UpO07+mPj`
+1. **Webhook URL (Production):** `https://app.orgatreeker.com/webhook` ← **Use app. subdomain!**
+2. **Webhook URL (Testing/Svix Play):** `https://play.svix.com/in/e_OxgBBYUmNx8XOCqDfBPBU9KDtSR/`
+3. **Signing Secret:** `whsec_CiZ71O5wJSN6lz73RCpR9Kr/0q0F8F3d`
 3. **Events Enabled:**
    - ✅ `payment.succeeded`
    - ✅ `payment.failed`
@@ -148,7 +149,7 @@ Your webhook receives:
   - Headers: webhook-id, webhook-timestamp, webhook-signature
   - Body: { type: "payment.succeeded", customer: {...}, ... }
         ↓
-Your webhook verifies signature using: whsec_3NJTaOxYLlAdVcsZo/jFWV4UpO07+mPj
+Your webhook verifies signature using: whsec_CiZ71O5wJSN6lz73RCpR9Kr/0q0F8F3d
         ↓
 Maps webhook-* headers to svix-* format for verification
         ↓
@@ -204,7 +205,7 @@ Make sure these are set in **Vercel Production**:
 
 # Dodo Payments
 ✅ DODO_BEARER_TOKEN=0UnngA9-GRgdCdRJ...
-✅ DODO_WEBHOOK_SECRET=whsec_3NJTaOxYLlAdVcsZo/jFWV4UpO07+mPj  ← NEW!
+✅ DODO_WEBHOOK_SECRET=whsec_CiZ71O5wJSN6lz73RCpR9Kr/0q0F8F3d  ← UPDATED!
 ✅ NEXT_PUBLIC_DODO_PRODUCT_MONTHLY=pdt_3c1A6P4Cpe8KhGYnJNiCN
 ✅ NEXT_PUBLIC_DODO_PRODUCT_YEARLY=pdt_SZ87OdK4dC9a9tpHTIUJZ
 ```
