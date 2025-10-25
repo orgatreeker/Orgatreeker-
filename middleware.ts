@@ -1,7 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { currentUser } from '@clerk/nextjs/server';
-import { hasActiveSubscription } from '@/lib/supabase/database';
 
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
@@ -55,21 +54,23 @@ export default clerkMiddleware(async (auth, request) => {
       return NextResponse.next();
     }
 
-    // Check subscription status from DATABASE (primary source of truth)
-    // This ensures we have the most up-to-date subscription status
-    const isSubscribed = await hasActiveSubscription(userId);
-
-    // Fallback: Also check Clerk metadata for backward compatibility
-    if (!isSubscribed) {
+    // Check subscription status from Clerk metadata
+    // NOTE: Webhook updates this metadata when user subscribes
+    try {
       const user = await currentUser();
       const subscription = user?.publicMetadata?.subscription as any;
-      const hasClerkSubscription = subscription?.status === 'active' || subscription?.status === 'trialing';
+      const hasActiveSubscription = subscription?.status === 'active' || subscription?.status === 'trialing';
 
-      if (!hasClerkSubscription) {
-        // Redirect to pricing page if no active subscription in both DB and Clerk
+      if (!hasActiveSubscription) {
+        // No active subscription - redirect to pricing page
         const pricingUrl = new URL('/pricing', request.url);
         return NextResponse.redirect(pricingUrl);
       }
+    } catch (error) {
+      console.error('Error checking subscription in middleware:', error);
+      // On error, redirect to pricing to be safe
+      const pricingUrl = new URL('/pricing', request.url);
+      return NextResponse.redirect(pricingUrl);
     }
 
     return NextResponse.next();
