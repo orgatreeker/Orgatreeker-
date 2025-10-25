@@ -1,6 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { currentUser } from '@clerk/nextjs/server';
+import { hasActiveSubscription } from '@/lib/supabase/database';
 
 const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
@@ -54,26 +55,36 @@ export default clerkMiddleware(async (auth, request) => {
       return NextResponse.next();
     }
 
-    // Check subscription status from Clerk metadata
-    // NOTE: Webhook updates this metadata when user subscribes
+    // Check subscription status - DATABASE FIRST (most reliable), then Clerk metadata
     try {
+      // Priority 1: Check database (primary source of truth)
+      const hasSubscription = await hasActiveSubscription(userId);
+      
+      if (hasSubscription) {
+        // User has active subscription in database
+        return NextResponse.next();
+      }
+
+      // Priority 2: Fall back to Clerk metadata (for backwards compatibility)
       const user = await currentUser();
       const subscription = user?.publicMetadata?.subscription as any;
-      const hasActiveSubscription = subscription?.status === 'active' || subscription?.status === 'trialing';
+      const hasActiveFromClerk = subscription?.status === 'active' || subscription?.status === 'trialing';
 
-      if (!hasActiveSubscription) {
-        // No active subscription - redirect to pricing page
+      if (!hasActiveFromClerk) {
+        // No active subscription in either database or Clerk - redirect to pricing
+        console.log(`User ${userId} does not have active subscription, redirecting to pricing`);
         const pricingUrl = new URL('/pricing', request.url);
         return NextResponse.redirect(pricingUrl);
       }
+
+      // Subscription found in Clerk metadata
+      return NextResponse.next();
     } catch (error) {
       console.error('Error checking subscription in middleware:', error);
       // On error, redirect to pricing to be safe
       const pricingUrl = new URL('/pricing', request.url);
       return NextResponse.redirect(pricingUrl);
     }
-
-    return NextResponse.next();
   }
 
   // For all other routes, just require authentication

@@ -11,11 +11,10 @@ export default function SuccessPage() {
   const { isLoaded, isSignedIn, user } = useUser()
   const router = useRouter()
   const [checking, setChecking] = useState(true)
-  const [retryCount, setRetryCount] = useState(0)
-  const maxRetries = 30 // Check for 30 seconds (increased from 10)
+  const [checked, setChecked] = useState(false)
 
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) {
+    if (!isLoaded || !isSignedIn || checked) {
       return
     }
 
@@ -30,13 +29,15 @@ export default function SuccessPage() {
           // Subscription found in database! Redirect to home
           console.log('✅ Subscription confirmed from database')
           setChecking(false)
+          setChecked(true)
+          // Short delay for UX, then redirect
           setTimeout(() => {
             router.push('/')
           }, 1500)
           return
         }
 
-        // Fallback: Check Clerk metadata
+        // Fallback: Check Clerk metadata once
         await user?.reload()
         const metadata = user?.publicMetadata as any
         const subscription = metadata?.subscription
@@ -46,41 +47,33 @@ export default function SuccessPage() {
           // Subscription found in Clerk! Redirect to home
           console.log('✅ Subscription confirmed from Clerk')
           setChecking(false)
+          setChecked(true)
           setTimeout(() => {
             router.push('/')
           }, 1500)
-        } else if (retryCount < maxRetries) {
-          // Not found yet, retry after 1 second
-          setTimeout(() => {
-            setRetryCount(prev => prev + 1)
-          }, 1000)
         } else {
-          // Max retries reached, but still redirect to home
+          // Subscription not found yet, but we'll redirect anyway
           // The middleware will handle redirecting back to pricing if still no subscription
-          console.warn('⚠️ Max retries reached, redirecting anyway')
+          console.log('⚠️ Subscription not found yet, but redirecting anyway')
           setChecking(false)
+          setChecked(true)
           setTimeout(() => {
             router.push('/')
           }, 2000)
         }
       } catch (error) {
         console.error('❌ Error checking subscription:', error)
-        // On error, retry if not at max retries
-        if (retryCount < maxRetries) {
-          setTimeout(() => {
-            setRetryCount(prev => prev + 1)
-          }, 1000)
-        } else {
-          // Max retries reached, redirect anyway
-          setTimeout(() => {
-            router.push('/')
-          }, 3000)
-        }
+        // On error, redirect anyway - middleware will handle it
+        setChecking(false)
+        setChecked(true)
+        setTimeout(() => {
+          router.push('/')
+        }, 2000)
       }
     }
 
     checkSubscription()
-  }, [isLoaded, isSignedIn, user, router, retryCount])
+  }, [isLoaded, isSignedIn, user, router, checked])
 
   if (!isLoaded) {
     return (
@@ -114,7 +107,7 @@ export default function SuccessPage() {
           </CardTitle>
           <CardDescription>
             {checking
-              ? "We're confirming your subscription. This usually takes a few seconds."
+              ? "We're confirming your subscription. This usually takes just a moment."
               : "Your subscription is now active. Redirecting you to the app..."
             }
           </CardDescription>
@@ -122,8 +115,8 @@ export default function SuccessPage() {
         <CardContent className="text-center space-y-4">
           {checking ? (
             <div className="text-sm text-muted-foreground">
-              <p>Checking subscription status... ({retryCount}/{maxRetries})</p>
-              <p className="mt-2">Please wait, this may take a moment.</p>
+              <p>Checking subscription status...</p>
+              <p className="mt-2">Please wait, this will only take a moment.</p>
             </div>
           ) : (
             <div className="space-y-3">

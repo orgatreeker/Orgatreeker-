@@ -1,14 +1,16 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useUser } from "@clerk/nextjs"
 import { useRouter } from "next/navigation"
 import PricingClient from "./pricing-client"
 import { Loader2 } from "lucide-react"
 
 export default function PricingPage() {
-  const { isLoaded, isSignedIn, user } = useUser()
+  const { isLoaded, isSignedIn, user, userId } = useUser()
   const router = useRouter()
+  const [checking, setChecking] = useState(true)
+  const [hasSubscription, setHasSubscription] = useState(false)
 
   useEffect(() => {
     if (!isLoaded) return
@@ -19,18 +21,46 @@ export default function PricingPage() {
       return
     }
 
-    // Check if user already has an active subscription
-    const metadata = user?.publicMetadata as any
-    const subscription = metadata?.subscription
-    const hasActiveSubscription = subscription?.status === 'active' || subscription?.status === 'trialing'
+    // Check subscription status from database and Clerk
+    const checkSubscription = async () => {
+      try {
+        // Priority 1: Check database (primary source of truth)
+        const response = await fetch('/api/check-subscription')
+        const data = await response.json()
 
-    // If user already has active subscription, redirect to home/dashboard
-    if (hasActiveSubscription) {
-      router.push("/")
+        if (data.isSubscribed) {
+          setHasSubscription(true)
+          setChecking(false)
+          router.push("/")
+          return
+        }
+
+        // Priority 2: Fall back to Clerk metadata
+        await user?.reload()
+        const metadata = user?.publicMetadata as any
+        const subscription = metadata?.subscription
+        const isActive = subscription?.status === 'active' || subscription?.status === 'trialing'
+
+        if (isActive) {
+          setHasSubscription(true)
+          setChecking(false)
+          router.push("/")
+        } else {
+          setHasSubscription(false)
+          setChecking(false)
+        }
+      } catch (error) {
+        console.error('Error checking subscription:', error)
+        // On error, assume no subscription and show pricing page
+        setHasSubscription(false)
+        setChecking(false)
+      }
     }
-  }, [isLoaded, isSignedIn, user, router])
 
-  if (!isLoaded) {
+    checkSubscription()
+  }, [isLoaded, isSignedIn, user, userId, router])
+
+  if (!isLoaded || checking) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -42,13 +72,9 @@ export default function PricingPage() {
     return null
   }
 
-  // Check subscription status
-  const metadata = user?.publicMetadata as any
-  const subscription = metadata?.subscription
-  const hasActiveSubscription = subscription?.status === 'active' || subscription?.status === 'trialing'
-
-  if (hasActiveSubscription) {
-    return null // Will redirect via useEffect
+  // If user has subscription, redirect (handled in useEffect)
+  if (hasSubscription) {
+    return null
   }
 
   return <PricingClient />
