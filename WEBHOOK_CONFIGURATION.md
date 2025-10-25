@@ -4,7 +4,21 @@
 
 Your app supports webhooks from Dodo Payments for handling subscription and payment events.
 
-### **Option 1: Svix Play (Testing & Development)**
+### **Production Webhook (PRIMARY - USE THIS)**
+
+For production use when your app is deployed.
+
+```
+Webhook URL: https://app.orgatreeker.com/webhook
+Signing Secret: whsec_CiZ71O5wJSN6lz73RCpR9Kr/0q0F8F3d
+```
+
+**Use this for:**
+- ✅ Production deployment
+- ✅ Real user payments
+- ✅ Actual subscription management
+
+### **Option 2: Svix Play (Testing & Development - OPTIONAL)**
 
 Perfect for testing webhooks locally or debugging webhook payloads.
 
@@ -25,20 +39,6 @@ Signing Secret: whsec_CiZ71O5wJSN6lz73RCpR9Kr/0q0F8F3d
 3. View incoming webhooks in the Svix Play dashboard
 4. See headers, payload, and signatures in real-time
 5. Forward to your local dev server for testing
-
-### **Option 2: Production Webhook (Vercel)**
-
-For production use when your app is deployed.
-
-```
-Webhook URL: https://app.orgatreeker.com/webhook
-Signing Secret: whsec_CiZ71O5wJSN6lz73RCpR9Kr/0q0F8F3d
-```
-
-**Use this for:**
-- Production deployment
-- Real user payments
-- Actual subscription management
 
 ---
 
