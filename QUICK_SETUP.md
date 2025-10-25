@@ -53,17 +53,17 @@ NEXT_PUBLIC_DODO_PRODUCT_YEARLY=pdt_SZ87OdK...
 
 Go to: https://dodo.link/dashboard → **Settings** → **Webhooks**
 
-### **For Production:**
-
-```
-Webhook URL: https://app.orgatreeker.com/webhook
-Signing Secret: whsec_CiZ71O5wJSN6lz73RCpR9Kr/0q0F8F3d
-```
-
-### **For Testing (Svix Play):**
+### **Current Setup (Svix Play for Testing):**
 
 ```
 Webhook URL: https://play.svix.com/in/e_OxgBBYUmNx8XOCqDfBPBU9KDtSR/
+Signing Secret: whsec_CiZ71O5wJSN6lz73RCpR9Kr/0q0F8F3d
+```
+
+### **For Production (when ready to go live):**
+
+```
+Webhook URL: https://app.orgatreeker.com/webhook
 Signing Secret: whsec_CiZ71O5wJSN6lz73RCpR9Kr/0q0F8F3d
 ```
 
@@ -115,7 +115,7 @@ Before testing, verify:
 - [ ] Both set to **Production** environment
 - [ ] Clicked **Redeploy** in Vercel
 - [ ] Deployment completed successfully (check status)
-- [ ] Webhook URL in Dodo = `https://app.orgatreeker.com/webhook`
+- [ ] Webhook URL in Dodo = `https://play.svix.com/in/e_OxgBBYUmNx8XOCqDfBPBU9KDtSR/` (testing)
 - [ ] Signing secret in Dodo matches
 - [ ] Test webhook returns 200 OK
 
@@ -192,7 +192,7 @@ Should see a row with:
 ```
 User subscribes
      ↓
-Dodo sends webhook to app.orgatreeker.com/webhook
+Dodo sends webhook to Svix Play (testing endpoint)
      ↓
 Webhook verifies signature ✅
      ↓

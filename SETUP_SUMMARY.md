@@ -29,15 +29,15 @@ After adding the environment variables:
 
 Go to: [Dodo Dashboard](https://dodo.link/dashboard) → **Settings** → **Webhooks**
 
-**For Production:**
+**Current Configuration (Svix Play for Testing):**
 ```
-URL: https://app.orgatreeker.com/webhook
+URL: https://play.svix.com/in/e_OxgBBYUmNx8XOCqDfBPBU9KDtSR/
 Secret: whsec_CiZ71O5wJSN6lz73RCpR9Kr/0q0F8F3d
 ```
 
-**For Testing (Svix Play):**
+**For Production (when ready to go live):**
 ```
-URL: https://play.svix.com/in/e_OxgBBYUmNx8XOCqDfBPBU9KDtSR/
+URL: https://app.orgatreeker.com/webhook
 Secret: whsec_CiZ71O5wJSN6lz73RCpR9Kr/0q0F8F3d
 ```
 
@@ -64,7 +64,7 @@ Checkout creates Dodo session
     ↓
 User pays on Dodo
     ↓
-Dodo sends webhook to app.orgatreeker.com/webhook
+Dodo sends webhook to Svix Play (testing) or app.orgatreeker.com/webhook (production)
     ↓
 Webhook verifies signature ✅
     ↓
