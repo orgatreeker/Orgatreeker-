@@ -28,8 +28,8 @@ export default function PricingClient() {
         body: JSON.stringify({
           product_id: productId,
           quantity: 1,
-          // Optionally override return_url:
-          // return_url: window.location.origin + "/",
+          // Use production domain for return URL
+          return_url: "https://app.orgatreeker.com/success",
         }),
       });
 

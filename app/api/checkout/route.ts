@@ -18,8 +18,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "product_id is required" }, { status: 400 });
     }
 
+    // Use production domain from environment variable, fallback to request origin
+    const productionDomain = process.env.NEXT_PUBLIC_APP_URL || process.env.DEFAULT_RETURN_URL?.replace('/success', '') || 'https://app.orgatreeker.com';
+    const origin = process.env.NODE_ENV === 'production' ? productionDomain : req.nextUrl.origin;
+    
     // Build return URL (absolute or relative supported; default to success page for webhook delay tolerance)
-    const origin = req.nextUrl.origin;
     const rawDefault = process.env.DEFAULT_RETURN_URL || `${origin}/success`;
     const resolveReturnUrl = (input: string | undefined, base: string) => {
       try {
@@ -33,6 +36,8 @@ export async function POST(req: NextRequest) {
       }
     };
     const return_url = resolveReturnUrl(providedReturnUrl, origin);
+
+    console.log('Checkout return URL:', return_url); // Debug log
 
     // Optionally attach Clerk user as Dodo customer (by email/name)
     const user = await currentUser();
