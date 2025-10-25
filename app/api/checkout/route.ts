@@ -18,10 +18,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "product_id is required" }, { status: 400 });
     }
 
-    // Build return URL - redirect to success page after payment
+    // Build return URL (absolute or relative supported; default to success page for webhook delay tolerance)
     const origin = req.nextUrl.origin;
-    const defaultReturn = process.env.DEFAULT_RETURN_URL || `${origin}/success`;
-    const return_url = providedReturnUrl || defaultReturn;
+    const rawDefault = process.env.DEFAULT_RETURN_URL || `${origin}/success`;
+    const resolveReturnUrl = (input: string | undefined, base: string) => {
+      try {
+        const val = input ?? rawDefault;
+        // if absolute URL, return as-is
+        if (/^https?:\/\//i.test(val)) return val;
+        // else treat as relative against origin
+        return new URL(val, base).toString();
+      } catch {
+        return new URL("/success", base).toString();
+      }
+    };
+    const return_url = resolveReturnUrl(providedReturnUrl, origin);
 
     // Optionally attach Clerk user as Dodo customer (by email/name)
     const user = await currentUser();

@@ -79,6 +79,7 @@ export default clerkMiddleware(async (auth, request) => {
   // For all other routes, just require authentication
   if (!userId) {
     await auth.protect();
+    return NextResponse.next();
   }
   return NextResponse.next();
 });
