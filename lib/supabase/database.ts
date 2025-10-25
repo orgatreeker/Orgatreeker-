@@ -274,7 +274,17 @@ export async function getSubscription(clerkUserId: string): Promise<Subscription
 
 export async function upsertSubscription(subscription: Subscription): Promise<Subscription | null> {
   try {
+    console.log('💾 ===== UPSERTING SUBSCRIPTION TO DATABASE =====')
+    console.log('📊 Subscription data:', JSON.stringify(subscription, null, 2))
+    
     const client = supabaseAdmin || supabase
+    
+    if (!client) {
+      console.error('❌ Supabase client is null!')
+      return null
+    }
+    
+    console.log('✅ Supabase client initialized')
 
     // Use upsert to handle both insert and update
     const { data, error } = await client
@@ -301,13 +311,18 @@ export async function upsertSubscription(subscription: Subscription): Promise<Su
       .single()
 
     if (error) {
-      console.error('Error upserting subscription:', error)
+      console.error('❌ Error upserting subscription:', error)
+      console.error('❌ Error details:', JSON.stringify(error, null, 2))
       return null
     }
 
+    console.log('✅ Subscription upserted successfully!')
+    console.log('📋 Data returned:', JSON.stringify(data, null, 2))
     return data
   } catch (error) {
-    console.error('Error in upsertSubscription:', error)
+    console.error('❌ Exception in upsertSubscription:', error)
+    console.error('❌ Error details:', error instanceof Error ? error.message : error)
+    console.error('❌ Stack trace:', error instanceof Error ? error.stack : 'No stack trace')
     return null
   }
 }
