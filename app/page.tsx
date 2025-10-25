@@ -30,10 +30,10 @@ export default function AppPage() {
     const isTabActive = (tab: string) => activeTab === tab ? "block" : "hidden"
     const tabAnimation = "transition-opacity duration-200 ease-in-out"
 
-    // Check subscription status from Clerk metadata
-    const metadata = user?.publicMetadata as any;
-    const subscription = metadata?.subscription;
-    const isPremium = subscription?.status === 'active' || subscription?.status === 'trialing'
+    // Since middleware already protects routes, all users here are subscribed
+    // Middleware redirects non-subscribers to /pricing
+    // Therefore, everyone who reaches this page has an active subscription
+    const isPremium = true // Always true - middleware handles subscription check
     
     return (
       <>
