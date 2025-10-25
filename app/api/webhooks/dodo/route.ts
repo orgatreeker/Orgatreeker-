@@ -3,6 +3,9 @@ import { clerkClient } from "@clerk/nextjs/server";
 import { Webhook } from "svix";
 import { upsertSubscription } from "@/lib/supabase/database";
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 /**
  * Dodo Payments Webhook Endpoint
  *
@@ -112,14 +115,14 @@ export async function POST(req: NextRequest) {
             plan = 'yearly';
           }
 
-          await updateUserSubscription(email, {
+          updateUserSubscription(email, {
             status: 'active',
             plan,
             subscriptionId: payload?.data?.subscription_id || paymentId,
             productId,
             paymentId,
             updatedAt: new Date().toISOString(),
-          });
+          }).catch((e) => console.error("updateUserSubscription error:", e));
         }
         console.log("✅ payment.succeeded", { eventId, payloadType, id: paymentId });
         break;
@@ -138,14 +141,14 @@ export async function POST(req: NextRequest) {
             plan = 'yearly';
           }
 
-          await updateUserSubscription(email, {
+          updateUserSubscription(email, {
             status: 'active',
             plan,
             subscriptionId,
             productId,
             paymentId: null,
             updatedAt: new Date().toISOString(),
-          });
+          }).catch((e) => console.error("updateUserSubscription error:", e));
         }
         console.log("✅ subscription.active", { eventId, payloadType, id: subscriptionId });
         break;
@@ -155,12 +158,12 @@ export async function POST(req: NextRequest) {
         const subscriptionId = payload?.data?.subscription_id;
 
         if (email) {
-          await updateUserSubscription(email, {
+          updateUserSubscription(email, {
             status: 'active',
             subscriptionId,
             paymentId: null,
             updatedAt: new Date().toISOString(),
-          });
+          }).catch((e) => console.error("updateUserSubscription error:", e));
         }
         console.log("✅ subscription.renewed", { eventId, payloadType, id: subscriptionId });
         break;
@@ -172,12 +175,12 @@ export async function POST(req: NextRequest) {
         const subscriptionId = payload?.data?.subscription_id;
 
         if (email) {
-          await updateUserSubscription(email, {
+          updateUserSubscription(email, {
             status: eventType.replace('subscription.', '') as any,
             subscriptionId,
             paymentId: null,
             updatedAt: new Date().toISOString(),
-          });
+          }).catch((e) => console.error("updateUserSubscription error:", e));
         }
         console.log(`⚠️ ${eventType}`, { eventId, payloadType, id: subscriptionId });
         break;
