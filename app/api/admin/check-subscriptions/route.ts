@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { supabaseAdmin } from "@/lib/supabase/client";
 
+// Force dynamic rendering - this route uses auth() which requires headers
+export const dynamic = 'force-dynamic';
+
 /**
  * Admin API endpoint to check if subscriptions table exists
  * and view current subscription data

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/client";
 
+// Force dynamic rendering - database checks should be runtime only
+export const dynamic = 'force-dynamic';
+
 /**
  * Simple endpoint to check if subscriptions table exists
  * Visit: http://localhost:3000/api/check-table

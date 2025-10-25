@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { hasActiveSubscription } from "@/lib/supabase/database";
 
+// Force dynamic rendering - this route uses auth() which requires headers
+export const dynamic = 'force-dynamic';
+
 /**
  * API endpoint to check if the current user has an active subscription
  * Checks the database for the most up-to-date subscription status
