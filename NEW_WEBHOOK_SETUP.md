@@ -5,8 +5,9 @@
 I've set up your new Dodo Payments webhook with the updated configuration:
 
 ### **New Webhook Details:**
-- **URL:** `https://orgatreeker.com/webhook`
+- **URL:** `https://app.orgatreeker.com/webhook` ← **IMPORTANT: Use app. subdomain!**
 - **Signing Secret:** `whsec_3NJTaOxYLlAdVcsZo/jFWV4UpO07+mPj`
+- **Headers:** Dodo sends `webhook-id`, `webhook-signature`, `webhook-timestamp` (not `svix-*`)
 
 ---
 
@@ -85,7 +86,7 @@ Make sure your Dodo webhook is set up correctly:
 
 ### **Dodo Dashboard Settings:**
 
-1. **Webhook URL:** `https://orgatreeker.com/webhook`
+1. **Webhook URL:** `https://app.orgatreeker.com/webhook` ← **Use app. subdomain!**
 2. **Signing Secret:** `whsec_3NJTaOxYLlAdVcsZo/jFWV4UpO07+mPj`
 3. **Events Enabled:**
    - ✅ `payment.succeeded`
@@ -141,13 +142,15 @@ User pays $6.83 on Dodo
         ↓
 Dodo processes payment ✅
         ↓
-Dodo sends webhook to: https://orgatreeker.com/webhook
+Dodo sends webhook to: https://app.orgatreeker.com/webhook
         ↓
 Your webhook receives:
-  - Headers: svix-id, svix-timestamp, svix-signature
+  - Headers: webhook-id, webhook-timestamp, webhook-signature
   - Body: { type: "payment.succeeded", customer: {...}, ... }
         ↓
 Your webhook verifies signature using: whsec_3NJTaOxYLlAdVcsZo/jFWV4UpO07+mPj
+        ↓
+Maps webhook-* headers to svix-* format for verification
         ↓
 ✅ Signature matches! (Authentic webhook)
         ↓
@@ -176,8 +179,8 @@ Your app now has **2 webhook URLs** (both work):
 
 | URL | File | Purpose |
 |-----|------|---------|
-| `https://orgatreeker.com/webhook` | `app/webhook/route.ts` | New, cleaner URL (recommended) |
-| `https://orgatreeker.com/api/webhooks/dodo` | `app/api/webhooks/dodo/route.ts` | Original URL (still works) |
+| `https://app.orgatreeker.com/webhook` | `app/webhook/route.ts` | New, cleaner URL (recommended) |
+| `https://app.orgatreeker.com/api/webhooks/dodo` | `app/api/webhooks/dodo/route.ts` | Original URL (still works) |
 
 Both point to the same handler code, so either works fine.
 
@@ -256,10 +259,12 @@ Make sure these are set in **Vercel Production**:
 
 | Issue | Solution |
 |-------|----------|
-| Signature verification fails | Update `DODO_WEBHOOK_SECRET` in Vercel, redeploy |
-| Webhook receives but doesn't save | Add `SUPABASE_SERVICE_ROLE_KEY` in Vercel, redeploy |
-| Webhook returns 404 | Make sure `/webhook` route is deployed |
-| User still sees pricing page | Check database for subscription entry |
+| **404 Not Found** | Wrong URL! Use `https://app.orgatreeker.com/webhook` (NOT `orgatreeker.com`) |
+| **Signature verification fails** | Update `DODO_WEBHOOK_SECRET` in Vercel, redeploy |
+| **"Deployment not found"** | Domain mismatch - use `app.orgatreeker.com` subdomain |
+| **Webhook receives but doesn't save** | Add `SUPABASE_SERVICE_ROLE_KEY` in Vercel, redeploy |
+| **Missing product_id** | Webhook defaults to 'monthly' plan when product_id is null |
+| **User still sees pricing page** | Check database for subscription entry |
 
 ---
 

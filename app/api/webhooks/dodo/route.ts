@@ -24,10 +24,16 @@ export async function POST(req: NextRequest) {
     // Read raw body (required for signature verification)
     const rawBody = await req.text();
 
-    // Get Svix headers for signature verification
-    const svixId = req.headers.get("svix-id");
-    const svixTimestamp = req.headers.get("svix-timestamp");
-    const svixSignature = req.headers.get("svix-signature");
+    console.log('📨 Webhook received - Headers:', {
+      'webhook-id': req.headers.get("webhook-id"),
+      'webhook-timestamp': req.headers.get("webhook-timestamp"),
+      'webhook-signature': req.headers.get("webhook-signature")?.substring(0, 20) + '...',
+    });
+
+    // Get webhook headers (Dodo uses webhook-* not svix-*)
+    const webhookId = req.headers.get("webhook-id");
+    const webhookTimestamp = req.headers.get("webhook-timestamp");
+    const webhookSignature = req.headers.get("webhook-signature");
 
     const webhookSecret = process.env.DODO_WEBHOOK_SECRET;
     const relaxed = process.env.DODO_WEBHOOK_RELAXED === 'true';
@@ -40,24 +46,26 @@ export async function POST(req: NextRequest) {
     // Verify the webhook signature using Svix (strict mode) or parse JSON (relaxed/dev mode)
     let payload: any = {};
     if (!relaxed) {
-      if (!svixId || !svixTimestamp || !svixSignature) {
-        console.error("Missing Svix headers");
+      if (!webhookId || !webhookTimestamp || !webhookSignature) {
+        console.error("❌ Missing webhook headers");
         return NextResponse.json({ error: "Missing webhook headers" }, { status: 400 });
       }
       try {
         const wh = new Webhook(webhookSecret as string);
+        // Map Dodo's webhook-* headers to Svix's expected svix-* format
         payload = wh.verify(rawBody, {
-          "svix-id": svixId,
-          "svix-timestamp": svixTimestamp,
-          "svix-signature": svixSignature,
+          "svix-id": webhookId,
+          "svix-timestamp": webhookTimestamp,
+          "svix-signature": webhookSignature,
         }) as any;
+        console.log('✅ Webhook signature verified successfully');
       } catch (err) {
         console.error("❌ Webhook signature verification failed!");
         console.error("Error details:", err);
         console.error("Secret being used (first 10 chars):", (webhookSecret || "").substring(0, 10) + "...");
-        console.error("Svix ID:", svixId);
-        console.error("Svix Timestamp:", svixTimestamp);
-        console.error("Svix Signature (first 20 chars):", svixSignature?.substring(0, 20) + "...");
+        console.error("Webhook ID:", webhookId);
+        console.error("Webhook Timestamp:", webhookTimestamp);
+        console.error("Webhook Signature (first 20 chars):", webhookSignature?.substring(0, 20) + "...");
         console.error("");
         console.error("🔧 TO FIX:");
         console.error("1. Go to Dodo Dashboard → Webhooks");
@@ -86,6 +94,16 @@ export async function POST(req: NextRequest) {
 
     // TODO: Add idempotency dedupe here (e.g., store event_id in DB and ignore duplicates)
     const eventId = payload?.event_id || payload?.id || null;
+
+    console.log('📊 Webhook Event:', {
+      type: eventType,
+      payloadType,
+      eventId,
+      email: payload?.data?.customer?.email,
+      subscriptionId: payload?.data?.subscription_id,
+      paymentId: payload?.data?.payment_id,
+      checkoutSessionId: payload?.data?.checkout_session_id,
+    });
 
     // Helper function to update user subscription in both Clerk and Database
     const updateUserSubscription = async (email: string, subscriptionData: any) => {
@@ -131,26 +149,40 @@ export async function POST(req: NextRequest) {
     switch (eventType) {
       case "payment.succeeded": {
         const email = payload?.data?.customer?.email;
-        const productId = payload?.data?.product_id;
+        let productId = payload?.data?.product_id;
         const paymentId = payload?.data?.payment_id;
+        const checkoutSessionId = payload?.data?.checkout_session_id;
+
+        // Handle missing product_id - try to infer from checkout session or subscription
+        if (!productId && checkoutSessionId) {
+          console.log('⚠️ product_id missing, checkout_session_id:', checkoutSessionId);
+          // Note: In a real scenario, you'd query Dodo API to get session details
+          // For now, we'll default to monthly
+        }
 
         if (email) {
           // Determine plan type from product ID
-          let plan = 'monthly';
+          let plan: 'monthly' | 'yearly' = 'monthly';
           if (productId === process.env.NEXT_PUBLIC_DODO_PRODUCT_YEARLY) {
             plan = 'yearly';
+          } else if (!productId) {
+            // If product_id is missing, default to monthly
+            console.warn('⚠️ product_id is null/missing, defaulting to monthly plan');
+            plan = 'monthly';
           }
 
-          updateUserSubscription(email, {
+          console.log(`💰 Processing payment for ${email}: plan=${plan}, productId=${productId || 'null'}`);
+
+          await updateUserSubscription(email, {
             status: 'active',
             plan,
             subscriptionId: payload?.data?.subscription_id || paymentId,
-            productId,
+            productId: productId || null,
             paymentId,
             updatedAt: new Date().toISOString(),
-          }).catch((e: any) => console.error("updateUserSubscription error:", e));
+          });
         }
-        console.log("✅ payment.succeeded", { eventId, payloadType, id: paymentId });
+        console.log("✅ payment.succeeded", { eventId, payloadType, id: paymentId, email });
         break;
       }
       case "payment.failed": {
