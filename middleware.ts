@@ -9,7 +9,7 @@ const isPublicRoute = createRouteMatcher([
   '/api/webhooks(.*)',
   '/terms(.*)',
   '/privacy(.*)',
-  '/',  // Landing page is public
+  // NOTE: '/' (home) is NOT public - it contains the app and requires subscription!
 ]);
 
 // Routes that need auth but NOT subscription (like pricing, test pages, success page)
@@ -23,6 +23,7 @@ const isAuthOnlyRoute = createRouteMatcher([
 ]);
 
 const isProtectedAppRoute = createRouteMatcher([
+  '/',  // Home page contains the full app - requires subscription!
   '/dashboard(.*)',
   '/budget(.*)',
   '/income(.*)',
