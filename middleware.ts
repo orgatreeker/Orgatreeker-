@@ -20,6 +20,8 @@ const isAuthOnlyRoute = createRouteMatcher([
   '/api/set-subscription(.*)',
   '/test-subscription(.*)',
   '/api/test-subscription(.*)',
+  '/debug-subscription(.*)',
+  '/check-subscriptions(.*)',
 ]);
 
 const isProtectedAppRoute = createRouteMatcher([
