@@ -7,6 +7,7 @@ const isPublicRoute = createRouteMatcher([
   '/sign-in(.*)',
   '/sign-up(.*)',
   '/api/webhooks(.*)',
+  '/webhook(.*)',  // New Dodo webhook endpoint
   '/terms(.*)',
   '/privacy(.*)',
   // NOTE: '/' (home) is NOT public - it contains the app and requires subscription!

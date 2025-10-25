@@ -30,44 +30,54 @@ export async function POST(req: NextRequest) {
     const svixSignature = req.headers.get("svix-signature");
 
     const webhookSecret = process.env.DODO_WEBHOOK_SECRET;
+    const relaxed = process.env.DODO_WEBHOOK_RELAXED === 'true';
 
-    if (!webhookSecret) {
-      console.warn("DODO_WEBHOOK_SECRET not set. Skipping signature verification (DEV ONLY).");
+    if (!webhookSecret && !relaxed) {
+      console.warn("DODO_WEBHOOK_SECRET not set.");
       return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
     }
 
-    // Verify the webhook signature using Svix
-    if (!svixId || !svixTimestamp || !svixSignature) {
-      console.error("Missing Svix headers");
-      return NextResponse.json({ error: "Missing webhook headers" }, { status: 400 });
-    }
-
+    // Verify the webhook signature using Svix (strict mode) or parse JSON (relaxed/dev mode)
     let payload: any = {};
-    try {
-      const wh = new Webhook(webhookSecret);
-      payload = wh.verify(rawBody, {
-        "svix-id": svixId,
-        "svix-timestamp": svixTimestamp,
-        "svix-signature": svixSignature,
-      }) as any;
-    } catch (err) {
-      console.error("❌ Webhook signature verification failed!");
-      console.error("Error details:", err);
-      console.error("Secret being used (first 10 chars):", webhookSecret.substring(0, 10) + "...");
-      console.error("Svix ID:", svixId);
-      console.error("Svix Timestamp:", svixTimestamp);
-      console.error("Svix Signature (first 20 chars):", svixSignature?.substring(0, 20) + "...");
-      console.error("");
-      console.error("🔧 TO FIX:");
-      console.error("1. Go to Dodo Dashboard → Webhooks");
-      console.error("2. Copy the Signing Secret");
-      console.error("3. Update DODO_WEBHOOK_SECRET in Vercel env vars");
-      console.error("4. Redeploy the app");
-      console.error("");
-      return NextResponse.json({
-        error: "Invalid signature",
-        hint: "Check DODO_WEBHOOK_SECRET in Vercel matches Dodo Dashboard"
-      }, { status: 400 });
+    if (!relaxed) {
+      if (!svixId || !svixTimestamp || !svixSignature) {
+        console.error("Missing Svix headers");
+        return NextResponse.json({ error: "Missing webhook headers" }, { status: 400 });
+      }
+      try {
+        const wh = new Webhook(webhookSecret as string);
+        payload = wh.verify(rawBody, {
+          "svix-id": svixId,
+          "svix-timestamp": svixTimestamp,
+          "svix-signature": svixSignature,
+        }) as any;
+      } catch (err) {
+        console.error("❌ Webhook signature verification failed!");
+        console.error("Error details:", err);
+        console.error("Secret being used (first 10 chars):", (webhookSecret || "").substring(0, 10) + "...");
+        console.error("Svix ID:", svixId);
+        console.error("Svix Timestamp:", svixTimestamp);
+        console.error("Svix Signature (first 20 chars):", svixSignature?.substring(0, 20) + "...");
+        console.error("");
+        console.error("🔧 TO FIX:");
+        console.error("1. Go to Dodo Dashboard → Webhooks");
+        console.error("2. Copy the Signing Secret");
+        console.error("3. Update DODO_WEBHOOK_SECRET in Vercel env vars");
+        console.error("4. Redeploy the app");
+        console.error("");
+        return NextResponse.json({
+          error: "Invalid signature",
+          hint: "Check DODO_WEBHOOK_SECRET in Vercel matches Dodo Dashboard"
+        }, { status: 400 });
+      }
+    } else {
+      try {
+        payload = JSON.parse(rawBody);
+        console.warn("⚠️ DODO_WEBHOOK_RELAXED=true: Signature verification is DISABLED for this request.");
+      } catch (err) {
+        console.error("Invalid JSON payload in relaxed mode:", err);
+        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+      }
     }
 
     // Basic routing by type/payload_type (examples taken from docs listings)
@@ -80,7 +90,8 @@ export async function POST(req: NextRequest) {
     // Helper function to update user subscription in both Clerk and Database
     const updateUserSubscription = async (email: string, subscriptionData: any) => {
       try {
-        const client = clerkClient;
+        const anyClerk = clerkClient as any;
+        const client = typeof anyClerk === 'function' ? await anyClerk() : anyClerk;
         const users = await client.users.getUserList({ emailAddress: [email] });
 
         if (users.data.length === 0) {
@@ -130,14 +141,14 @@ export async function POST(req: NextRequest) {
             plan = 'yearly';
           }
 
-          await updateUserSubscription(email, {
+          updateUserSubscription(email, {
             status: 'active',
             plan,
             subscriptionId: payload?.data?.subscription_id || paymentId,
             productId,
             paymentId,
             updatedAt: new Date().toISOString(),
-          });
+          }).catch((e: any) => console.error("updateUserSubscription error:", e));
         }
         console.log("✅ payment.succeeded", { eventId, payloadType, id: paymentId });
         break;
@@ -153,14 +164,14 @@ export async function POST(req: NextRequest) {
             plan = 'yearly';
           }
 
-          await updateUserSubscription(email, {
+          updateUserSubscription(email, {
             status: 'failed',
             plan,
             subscriptionId: payload?.data?.subscription_id || paymentId,
             productId,
             paymentId,
             updatedAt: new Date().toISOString(),
-          });
+          }).catch((e: any) => console.error("updateUserSubscription error:", e));
         }
         console.log("payment.failed", { eventId, payloadType, id: payload?.data?.payment_id });
         break;
@@ -176,14 +187,14 @@ export async function POST(req: NextRequest) {
             plan = 'yearly';
           }
 
-          await updateUserSubscription(email, {
+          updateUserSubscription(email, {
             status: 'active',
             plan,
             subscriptionId,
             productId,
             paymentId: null,
             updatedAt: new Date().toISOString(),
-          });
+          }).catch((e: any) => console.error("updateUserSubscription error:", e));
         }
         console.log("✅ subscription.active", { eventId, payloadType, id: subscriptionId });
         break;
@@ -193,12 +204,12 @@ export async function POST(req: NextRequest) {
         const subscriptionId = payload?.data?.subscription_id;
 
         if (email) {
-          await updateUserSubscription(email, {
+          updateUserSubscription(email, {
             status: 'active',
             subscriptionId,
             paymentId: null,
             updatedAt: new Date().toISOString(),
-          });
+          }).catch((e: any) => console.error("updateUserSubscription error:", e));
         }
         console.log("✅ subscription.renewed", { eventId, payloadType, id: subscriptionId });
         break;
@@ -210,12 +221,12 @@ export async function POST(req: NextRequest) {
         const subscriptionId = payload?.data?.subscription_id;
 
         if (email) {
-          await updateUserSubscription(email, {
+          updateUserSubscription(email, {
             status: eventType.replace('subscription.', '') as any,
             subscriptionId,
             paymentId: null,
             updatedAt: new Date().toISOString(),
-          });
+          }).catch((e: any) => console.error("updateUserSubscription error:", e));
         }
         console.log(`⚠️ ${eventType}`, { eventId, payloadType, id: subscriptionId });
         break;
@@ -235,14 +246,14 @@ export async function POST(req: NextRequest) {
             plan = 'yearly';
           }
 
-          await updateUserSubscription(email, {
+          updateUserSubscription(email, {
             status: 'active',
             plan,
             subscriptionId,
             productId,
             paymentId: null,
             updatedAt: new Date().toISOString(),
-          });
+          }).catch((e: any) => console.error("updateUserSubscription error:", e));
         }
         console.log("subscription.plan_changed", { eventId, payloadType, id: subscriptionId });
         break;
@@ -275,4 +286,24 @@ export async function POST(req: NextRequest) {
     // Return 500 for unexpected errors; Dodo may retry delivery
     return NextResponse.json({ error: "Webhook handler error" }, { status: 500 });
   }
+}
+
+/**
+ * Simple health check to validate deployment & env wiring
+ * Doesn’t expose secrets; safe to call from browser or Dodo dashboard manually.
+ */
+export async function GET() {
+  const mode = process.env.DODO_WEBHOOK_RELAXED === 'true' ? 'relaxed' : 'strict';
+  const secretConfigured = !!process.env.DODO_WEBHOOK_SECRET;
+  const serviceRoleConfigured = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  return NextResponse.json({
+    ok: true,
+    mode,
+    secretConfigured,
+    serviceRoleConfigured,
+    note: mode === 'relaxed'
+      ? 'Relaxed mode disables signature verification (dev only). Turn off in production.'
+      : 'Strict mode verifies Svix signatures.',
+  });
 }

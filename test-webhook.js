@@ -16,7 +16,7 @@ const crypto = require('crypto');
 // ========================================
 
 const USER_EMAIL = 'YOUR_EMAIL@example.com'; // ← CHANGE THIS to your email
-const WEBHOOK_URL = 'http://localhost:3000/api/webhooks/dodo'; // Local dev URL
+const WEBHOOK_URL = 'http://localhost:3000/webhook'; // Local dev URL (new route alias)
 const WEBHOOK_SECRET = process.env.DODO_WEBHOOK_SECRET || 'whsec_ko62zyrTktRwLxwxL+au3X2NOk0E6Iqe';
 const PRODUCT_ID = process.env.NEXT_PUBLIC_DODO_PRODUCT_MONTHLY || 'pdt_3c1A6P4Cpe8KhGYnJNiCN';
 
