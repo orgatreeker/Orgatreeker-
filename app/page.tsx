@@ -22,21 +22,8 @@ export default function AppPage() {
     setLoadedTabs(prev => new Set(prev).add(activeTab))
   }, [activeTab])
 
-  // Check subscription status and redirect to pricing if not subscribed
-  useEffect(() => {
-    if (isLoaded && isSignedIn && user) {
-      const metadata = user.publicMetadata as any;
-      const subscription = metadata?.subscription;
-
-      // Check if user has an active subscription
-      const isActive = subscription?.status === 'active' || subscription?.status === 'trialing';
-
-      if (!isActive) {
-        // Redirect to pricing page if no active subscription
-        router.push('/pricing');
-      }
-    }
-  }, [isLoaded, isSignedIn, user, router])
+  // Note: Subscription check is now handled by middleware (checking database first)
+  // No need for redundant check here - middleware will redirect to /pricing if needed
 
   // Keep visited tabs mounted for smooth transitions and state preservation
   const renderAllTabs = () => {

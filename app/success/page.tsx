@@ -12,25 +12,39 @@ export default function SuccessPage() {
   const router = useRouter()
   const [checking, setChecking] = useState(true)
   const [retryCount, setRetryCount] = useState(0)
-  const maxRetries = 10 // Check for 10 seconds
+  const maxRetries = 30 // Check for 30 seconds (increased from 10)
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) {
       return
     }
 
-    // Function to check subscription status
+    // Function to check subscription status from DATABASE (primary) and Clerk (fallback)
     const checkSubscription = async () => {
       try {
-        // Force reload user data from Clerk
-        await user?.reload()
+        // Check database first (most reliable and up-to-date)
+        const dbCheckResponse = await fetch('/api/check-subscription')
+        const dbData = await dbCheckResponse.json()
 
+        if (dbData.isSubscribed) {
+          // Subscription found in database! Redirect to home
+          console.log('✅ Subscription confirmed from database')
+          setChecking(false)
+          setTimeout(() => {
+            router.push('/')
+          }, 1500)
+          return
+        }
+
+        // Fallback: Check Clerk metadata
+        await user?.reload()
         const metadata = user?.publicMetadata as any
         const subscription = metadata?.subscription
         const isActive = subscription?.status === 'active' || subscription?.status === 'trialing'
 
         if (isActive) {
-          // Subscription found! Redirect to home
+          // Subscription found in Clerk! Redirect to home
+          console.log('✅ Subscription confirmed from Clerk')
           setChecking(false)
           setTimeout(() => {
             router.push('/')
@@ -42,17 +56,26 @@ export default function SuccessPage() {
           }, 1000)
         } else {
           // Max retries reached, but still redirect to home
+          // The middleware will handle redirecting back to pricing if still no subscription
+          console.warn('⚠️ Max retries reached, redirecting anyway')
           setChecking(false)
           setTimeout(() => {
             router.push('/')
           }, 2000)
         }
       } catch (error) {
-        console.error('Error checking subscription:', error)
-        // On error, still redirect after a delay
-        setTimeout(() => {
-          router.push('/')
-        }, 3000)
+        console.error('❌ Error checking subscription:', error)
+        // On error, retry if not at max retries
+        if (retryCount < maxRetries) {
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1)
+          }, 1000)
+        } else {
+          // Max retries reached, redirect anyway
+          setTimeout(() => {
+            router.push('/')
+          }, 3000)
+        }
       }
     }
 

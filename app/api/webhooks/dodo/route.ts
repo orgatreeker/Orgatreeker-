@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { clerkClient } from "@clerk/nextjs/server";
 import { Webhook } from "svix";
+import { upsertSubscription } from "@/lib/supabase/database";
 
 /**
  * Dodo Payments Webhook Endpoint
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
     // TODO: Add idempotency dedupe here (e.g., store event_id in DB and ignore duplicates)
     const eventId = payload?.event_id || payload?.id || null;
 
-    // Helper function to update user subscription in Clerk
+    // Helper function to update user subscription in both Clerk and Database
     const updateUserSubscription = async (email: string, subscriptionData: any) => {
       try {
         const client = await clerkClient();
@@ -70,15 +71,31 @@ export async function POST(req: NextRequest) {
         }
 
         const user = users.data[0];
+
+        // Update Clerk metadata (for backward compatibility)
         await client.users.updateUserMetadata(user.id, {
           publicMetadata: {
             subscription: subscriptionData,
           },
         });
 
-        console.log(`Updated subscription for user ${user.id}:`, subscriptionData);
+        // CRITICAL: Save to database for reliable persistence
+        await upsertSubscription({
+          clerk_user_id: user.id,
+          email: email,
+          status: subscriptionData.status,
+          plan: subscriptionData.plan,
+          subscription_id: subscriptionData.subscriptionId,
+          product_id: subscriptionData.productId,
+          payment_id: subscriptionData.paymentId,
+          last_event_type: eventType,
+          last_event_id: eventId,
+        });
+
+        console.log(`✅ Updated subscription for user ${user.id} in both Clerk and Database:`, subscriptionData);
       } catch (error) {
-        console.error("Error updating user subscription:", error);
+        console.error("❌ Error updating user subscription:", error);
+        // Log but don't throw - we still want to return 200 to Dodo
       }
     };
 
@@ -86,6 +103,7 @@ export async function POST(req: NextRequest) {
       case "payment.succeeded": {
         const email = payload?.data?.customer?.email;
         const productId = payload?.data?.product_id;
+        const paymentId = payload?.data?.payment_id;
 
         if (email) {
           // Determine plan type from product ID
@@ -97,12 +115,13 @@ export async function POST(req: NextRequest) {
           await updateUserSubscription(email, {
             status: 'active',
             plan,
-            subscriptionId: payload?.data?.subscription_id || payload?.data?.payment_id,
+            subscriptionId: payload?.data?.subscription_id || paymentId,
             productId,
+            paymentId,
             updatedAt: new Date().toISOString(),
           });
         }
-        console.log("payment.succeeded", { eventId, payloadType, id: payload?.data?.payment_id });
+        console.log("✅ payment.succeeded", { eventId, payloadType, id: paymentId });
         break;
       }
       case "payment.failed":
@@ -111,6 +130,7 @@ export async function POST(req: NextRequest) {
       case "subscription.active": {
         const email = payload?.data?.customer?.email;
         const productId = payload?.data?.product_id;
+        const subscriptionId = payload?.data?.subscription_id;
 
         if (email) {
           let plan = 'monthly';
@@ -121,40 +141,45 @@ export async function POST(req: NextRequest) {
           await updateUserSubscription(email, {
             status: 'active',
             plan,
-            subscriptionId: payload?.data?.subscription_id,
+            subscriptionId,
             productId,
+            paymentId: null,
             updatedAt: new Date().toISOString(),
           });
         }
-        console.log("subscription.active", { eventId, payloadType, id: payload?.data?.subscription_id });
+        console.log("✅ subscription.active", { eventId, payloadType, id: subscriptionId });
         break;
       }
       case "subscription.renewed": {
         const email = payload?.data?.customer?.email;
+        const subscriptionId = payload?.data?.subscription_id;
 
         if (email) {
           await updateUserSubscription(email, {
             status: 'active',
-            subscriptionId: payload?.data?.subscription_id,
+            subscriptionId,
+            paymentId: null,
             updatedAt: new Date().toISOString(),
           });
         }
-        console.log("subscription.renewed", { eventId, payloadType, id: payload?.data?.subscription_id });
+        console.log("✅ subscription.renewed", { eventId, payloadType, id: subscriptionId });
         break;
       }
       case "subscription.cancelled":
       case "subscription.failed":
       case "subscription.expired": {
         const email = payload?.data?.customer?.email;
+        const subscriptionId = payload?.data?.subscription_id;
 
         if (email) {
           await updateUserSubscription(email, {
-            status: eventType.replace('subscription.', ''),
-            subscriptionId: payload?.data?.subscription_id,
+            status: eventType.replace('subscription.', '') as any,
+            subscriptionId,
+            paymentId: null,
             updatedAt: new Date().toISOString(),
           });
         }
-        console.log(eventType, { eventId, payloadType, id: payload?.data?.subscription_id });
+        console.log(`⚠️ ${eventType}`, { eventId, payloadType, id: subscriptionId });
         break;
       }
       case "subscription.on_hold":

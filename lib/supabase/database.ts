@@ -1,4 +1,20 @@
-import { supabase } from './client'
+import { supabase, supabaseAdmin } from './client'
+
+export interface Subscription {
+  id?: string
+  clerk_user_id: string
+  email: string
+  status: 'active' | 'inactive' | 'trialing' | 'cancelled' | 'failed' | 'expired'
+  plan?: 'monthly' | 'yearly'
+  subscription_id?: string
+  product_id?: string
+  payment_id?: string
+  created_at?: string
+  updated_at?: string
+  expires_at?: string
+  last_event_type?: string
+  last_event_id?: string
+}
 
 // User operations
 export async function createOrGetUser(clerkUserId: string, email?: string, name?: string) {
@@ -231,5 +247,92 @@ export async function createOrUpdateUserSettings(clerkUserId: string, settings: 
 
     if (error) throw error
     return data
+  }
+}
+
+// Subscription operations
+export async function getSubscription(clerkUserId: string): Promise<Subscription | null> {
+  try {
+    const client = supabaseAdmin || supabase
+    const { data, error } = await client
+      .from('subscriptions')
+      .select('*')
+      .eq('clerk_user_id', clerkUserId)
+      .maybeSingle()
+
+    if (error) {
+      console.error('Error fetching subscription:', error)
+      return null
+    }
+
+    return data
+  } catch (error) {
+    console.error('Error in getSubscription:', error)
+    return null
+  }
+}
+
+export async function upsertSubscription(subscription: Subscription): Promise<Subscription | null> {
+  try {
+    const client = supabaseAdmin || supabase
+
+    // Use upsert to handle both insert and update
+    const { data, error } = await client
+      .from('subscriptions')
+      .upsert(
+        {
+          clerk_user_id: subscription.clerk_user_id,
+          email: subscription.email,
+          status: subscription.status,
+          plan: subscription.plan,
+          subscription_id: subscription.subscription_id,
+          product_id: subscription.product_id,
+          payment_id: subscription.payment_id,
+          expires_at: subscription.expires_at,
+          last_event_type: subscription.last_event_type,
+          last_event_id: subscription.last_event_id,
+        },
+        {
+          onConflict: 'clerk_user_id',
+          ignoreDuplicates: false,
+        }
+      )
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error upserting subscription:', error)
+      return null
+    }
+
+    return data
+  } catch (error) {
+    console.error('Error in upsertSubscription:', error)
+    return null
+  }
+}
+
+export async function hasActiveSubscription(clerkUserId: string): Promise<boolean> {
+  try {
+    const subscription = await getSubscription(clerkUserId)
+
+    if (!subscription) {
+      return false
+    }
+
+    // Check if subscription is active or trialing
+    const isActive = subscription.status === 'active' || subscription.status === 'trialing'
+
+    // Check if subscription hasn't expired (if expires_at is set)
+    if (subscription.expires_at) {
+      const expiresAt = new Date(subscription.expires_at)
+      const now = new Date()
+      return isActive && expiresAt > now
+    }
+
+    return isActive
+  } catch (error) {
+    console.error('Error in hasActiveSubscription:', error)
+    return false
   }
 }
