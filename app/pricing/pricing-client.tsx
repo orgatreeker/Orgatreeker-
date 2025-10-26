@@ -3,13 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
-
-// BillingSDK UI component (locally scaffolded)
-import { PricingTableTwo } from "@/components/billingsdk/pricing-table-two";
-// Plans config mapped to your Dodo Products
+import { EnhancedPricing } from "@/components/billingsdk/enhanced-pricing";
 import { plans } from "@/lib/billingsdk-config";
-
-type PlanKey = "monthly" | "yearly";
 
 export default function PricingClient() {
   const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null);
@@ -53,19 +48,19 @@ export default function PricingClient() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40">
         <div className="container mx-auto px-4 md:px-6 h-14 md:h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
-              FT
+            <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold">
+              OT
             </div>
-            <span className="font-semibold">FinanceTracker</span>
+            <span className="font-semibold">OrgaTreeker</span>
           </Link>
           <div className="flex items-center gap-2">
             <Link href="/">
               <button className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 disabled:pointer-events-none disabled:opacity-50 bg-transparent hover:bg-accent hover:text-accent-foreground h-9 px-3">
-                Home
+                Dashboard
               </button>
             </Link>
             <UserButton afterSignOutUrl="/" />
@@ -73,19 +68,45 @@ export default function PricingClient() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 md:px-6 py-10 md:py-16 max-w-6xl">
-        <PricingTableTwo
+      <main className="container mx-auto px-4 md:px-6 py-10 md:py-20 max-w-7xl">
+        {/* Hero Section */}
+        <div className="text-center mb-12">
+          <div className="inline-block px-4 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium mb-6">
+            🎉 Limited Time: Extended Free Trials Available
+          </div>
+        </div>
+
+        <EnhancedPricing
           plans={plans}
-          title="Simple, transparent pricing"
-          description="Choose a plan that fits your budgeting needs. Upgrade or cancel anytime."
+          title="Take Control of Your Finances Today"
+          description="Join thousands of users who are already managing their money smarter. Start your free trial — no credit card required!"
           onPlanSelect={(planId) => handleCheckout(planId)}
-          size="medium"
-          theme="classic"
           loadingPlanId={loadingPlanId}
         />
 
-        <div className="mt-12 text-center text-sm text-muted-foreground">
-          Secure checkout is powered by Dodo Payments. Taxes may apply based on your location.
+        {/* Trust Section */}
+        <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto text-center">
+          <div className="p-6">
+            <div className="text-3xl font-bold mb-2">10,000+</div>
+            <p className="text-muted-foreground">Active Users</p>
+          </div>
+          <div className="p-6">
+            <div className="text-3xl font-bold mb-2">$2M+</div>
+            <p className="text-muted-foreground">Money Tracked</p>
+          </div>
+          <div className="p-6">
+            <div className="text-3xl font-bold mb-2">4.9/5</div>
+            <p className="text-muted-foreground">User Rating</p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-16 text-center">
+          <p className="text-sm text-muted-foreground">
+            Secure checkout powered by Dodo Payments •
+            <Link href="/terms" className="hover:underline ml-1">Terms</Link> •
+            <Link href="/privacy" className="hover:underline ml-1">Privacy</Link>
+          </p>
         </div>
       </main>
     </div>

@@ -5,12 +5,19 @@
 
 export type PricingPlan = {
   id: string; // product_id from Dodo
-  key: 'monthly' | 'yearly';
+  key: 'monthly' | 'yearly' | 'custom';
   name: string;
   subtitle: string;
   priceLabel: string;
+  originalPrice?: string; // For showing discount
+  trial?: string; // Free trial period
+  savings?: string; // Highlight savings
   features: string[];
   popular?: boolean;
+  recommended?: boolean;
+  badge?: string;
+  ctaText?: string;
+  ctaVariant?: 'default' | 'outline' | 'secondary';
 };
 
 const PRODUCT_IDS = {
@@ -23,30 +30,62 @@ export const plans: PricingPlan[] = [
     id: PRODUCT_IDS.monthly,
     key: 'monthly',
     name: 'Monthly',
-    subtitle: 'Full access, billed monthly',
-    priceLabel: '$6.83 / month',
+    subtitle: 'Perfect to get started',
+    priceLabel: '$8/month',
+    trial: '7-day free trial',
     features: [
+      'Unlimited income & expense tracking',
       'Complete budget management',
-      'Income and expense tracking',
-      'Smart insights & reports',
+      'Smart insights & analytics',
       'Multi-currency support',
       'Email support',
+      'Mobile-friendly dashboard',
     ],
+    ctaText: 'Start 7-Day Free Trial',
+    ctaVariant: 'outline',
   },
   {
     id: PRODUCT_IDS.yearly,
     key: 'yearly',
     name: 'Yearly',
-    subtitle: 'Best value - save 58%',
-    priceLabel: '$34.71 / year',
+    subtitle: 'Most Popular Choice',
+    priceLabel: '$49/year',
+    originalPrice: '$96/year',
+    trial: '14-day free trial',
+    savings: 'Save $47/year',
+    badge: 'BEST VALUE',
     features: [
-      'Everything in Monthly',
-      '7 months FREE',
-      'Priority support',
-      'Advanced analytics',
+      'Everything in Monthly plan',
+      '14-day free trial (2x longer)',
+      'Save 49% compared to monthly',
+      'Priority email support',
+      'Advanced analytics & reports',
       'Early access to new features',
+      'Lifetime updates included',
     ],
     popular: true,
+    recommended: true,
+    ctaText: 'Start 14-Day Free Trial',
+    ctaVariant: 'default',
+  },
+  {
+    id: 'custom',
+    key: 'custom',
+    name: 'Enterprise',
+    subtitle: 'For teams & businesses',
+    priceLabel: '$299/year',
+    badge: 'CUSTOM',
+    features: [
+      'Everything in Yearly plan',
+      'Dedicated account manager',
+      'Custom integrations & API access',
+      'Team collaboration features',
+      'Advanced security & compliance',
+      'Custom training & onboarding',
+      'SLA & priority support',
+    ],
+    ctaText: 'Contact Us',
+    ctaVariant: 'secondary',
   },
 ];
 
