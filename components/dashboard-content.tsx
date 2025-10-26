@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { TrendingUp, TrendingDown, DollarSign, PiggyBank, Target, Loader2, User, Settings } from "lucide-react"
+import { TrendingUp, TrendingDown, DollarSign, PiggyBank, Target, Loader2, User, Settings, RefreshCw } from "lucide-react"
 import {
   LineChart,
   Line,
@@ -31,102 +31,63 @@ import {
 } from "recharts"
 import { LogoutButton } from "@/components/logout-button"
 import type { Profile } from "@/lib/profile-utils"
+import { useData } from "@/contexts/data-context"
 
 interface DashboardContentProps {
   user: any
   profile: Profile | null
 }
 
-interface IncomeSource {
-  id: string
-  name: string
-  category: string
-  amount: number
-  month: number
-  year: number
-}
-
-interface BudgetCategory {
-  id: string
-  name: string
-  type: string
-  budgeted_amount: number
-  month: number
-  year: number
-}
-
-interface Transaction {
-  id: string
-  category: string
-  subcategory: string
-  notes: string
-  amount: number
-  transaction_date: string
-  category_id?: string
-  month: number
-  year: number
-}
-
 export function DashboardContent({ user, profile }: DashboardContentProps) {
+  // Use shared data context for real-time updates! 🚀
+  const {
+    incomeSources,
+    budgetCategories,
+    transactions,
+    isLoading: contextLoading
+  } = useData()
+
   const [sortBy, setSortBy] = useState("recent")
-  const [isLoading, setIsLoading] = useState(true)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([])
-  const [budgetCategories, setBudgetCategories] = useState<BudgetCategory[]>([])
-  const [transactions, setTransactions] = useState<Transaction[]>([])
   const [historicalData, setHistoricalData] = useState<any[]>([])
   const [previousMonthData, setPreviousMonthData] = useState<{ income: number; expenses: number }>({
     income: 0,
     expenses: 0,
   })
+  const [historicalLoading, setHistoricalLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const router = useRouter()
-    const currentDate = new Date()
+  const currentDate = new Date()
   const currentYear = currentDate.getFullYear()
   const currentMonth = currentDate.getMonth() + 1
 
+  // Load historical data once on mount (dashboard-specific data)
   useEffect(() => {
     if (user) {
-      Promise.all([
-        fetchIncomeSources(user.id),
-        fetchBudgetData(user.id),
-        fetchTransactions(user.id),
-        fetchHistoricalData(user.id),
-        fetchPreviousMonthData(user.id),
-      ]).finally(() => setIsLoading(false))
+      loadHistoricalData()
     }
   }, [user])
 
-  const fetchIncomeSources = async (userId: string) => {
+  const loadHistoricalData = async () => {
+    if (!user) return
+    setHistoricalLoading(true)
     try {
-      const { getIncomeSources } = await import('@/lib/supabase/database')
-      const data = await getIncomeSources(userId, currentMonth, currentYear)
-      setIncomeSources(data)
-    } catch (error) {
-      console.error("Error fetching income sources:", error)
-      setError("Failed to load income data")
+      await Promise.all([
+        fetchHistoricalData(user.id),
+        fetchPreviousMonthData(user.id),
+      ])
+    } finally {
+      setHistoricalLoading(false)
     }
   }
 
-  const fetchBudgetData = async (userId: string) => {
+  const handleRefreshCharts = async () => {
+    setIsRefreshing(true)
     try {
-      const { getBudgetCategories } = await import('@/lib/supabase/database')
-      const data = await getBudgetCategories(userId, currentMonth, currentYear)
-      setBudgetCategories(data)
-    } catch (error) {
-      console.error("Error fetching budget data:", error)
-      setError("Failed to load budget data")
-    }
-  }
-
-  const fetchTransactions = async (userId: string) => {
-    try {
-      const { getTransactions } = await import('@/lib/supabase/database')
-      const data = await getTransactions(userId, currentMonth, currentYear)
-      setTransactions(data)
-    } catch (error) {
-      console.error("Error fetching transactions:", error)
-      setError("Failed to load transactions")
+      await loadHistoricalData()
+    } finally {
+      setIsRefreshing(false)
     }
   }
 
@@ -275,7 +236,8 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
     }
   })
 
-  if (isLoading) {
+  // Show loading only if both context and historical data are loading
+  if (contextLoading || historicalLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -330,9 +292,21 @@ export function DashboardContent({ user, profile }: DashboardContentProps) {
 
           <div className="flex items-center justify-between">
             <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-            <Badge variant="secondary" className="text-sm">
-              {currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-            </Badge>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefreshCharts}
+                disabled={isRefreshing}
+                className="gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                {isRefreshing ? 'Refreshing...' : 'Refresh Charts'}
+              </Button>
+              <Badge variant="secondary" className="text-sm">
+                {currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+              </Badge>
+            </div>
           </div>
 
           {/* Summary Cards */}
