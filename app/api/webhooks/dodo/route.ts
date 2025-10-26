@@ -1,151 +1,184 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { clerkClient } from "@clerk/nextjs/server";
 import { Webhook } from "svix";
+import crypto from "crypto";
 import { upsertSubscription } from "@/lib/supabase/database";
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/**
+ * In-memory dedupe for recent events (best-effort; use DB for production durability)
+ */
+const RECENT_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const MAX_RECENT = 1000;
+const recentEvents = new Map<string, number>();
+
+function purgeOld(now: number) {
+  for (const [id, ts] of recentEvents) {
+    if (now - ts > RECENT_TTL_MS) recentEvents.delete(id);
+  }
+  if (recentEvents.size > MAX_RECENT) {
+    // Drop oldest entries if over limit
+    const toDrop = recentEvents.size - MAX_RECENT;
+    const keys = Array.from(recentEvents.entries()).sort((a, b) => a[1] - b[1]).slice(0, toDrop);
+    for (const [id] of keys) recentEvents.delete(id);
+  }
+}
+function isDuplicateEvent(eventId?: string | null) {
+  if (!eventId) return false;
+  const now = Date.now();
+  purgeOld(now);
+  if (recentEvents.has(eventId)) return true;
+  recentEvents.set(eventId, now);
+  return false;
+}
+
+function jsonWithCID(cid: string, data: unknown, init?: number | ResponseInit) {
+  const res = NextResponse.json(data, typeof init === "number" ? { status: init } : init);
+  res.headers.set("x-correlation-id", cid);
+  return res;
+}
+
+function first20(x?: string | null) {
+  return x ? x.slice(0, 20) + "..." : null;
+}
 
 /**
  * Dodo Payments Webhook Endpoint
  *
- * Notes:
- * - Keep this endpoint fast and idempotent.
- * - Verify signatures using your webhook secret (DODO_WEBHOOK_SECRET).
- * - Handle retries: Dodo may retry delivery; dedupe by event id if provided.
- *
- * This webhook updates Clerk user metadata with subscription status
- *
- * Env:
- * - DODO_WEBHOOK_SECRET
+ * - Verifies Svix signatures (strict by default)
+ * - Accepts either 'svix-*' or 'webhook-*' header names
+ * - Idempotency: de-dupes same event_id within short TTL
  */
 export async function POST(req: NextRequest) {
+  // Read raw body first for signature verification
+  const rawBody = await req.text();
+
+  // Support both header styles
+  const svixId = req.headers.get("svix-id") || req.headers.get("webhook-id");
+  const svixTimestamp = req.headers.get("svix-timestamp") || req.headers.get("webhook-timestamp");
+  const svixSignature = req.headers.get("svix-signature") || req.headers.get("webhook-signature");
+
+  console.log("📨 Webhook received - Headers:", {
+    "svix-id": svixId,
+    "svix-timestamp": svixTimestamp,
+    "svix-signature": first20(svixSignature),
+  });
+
+  const webhookSecret = process.env.DODO_WEBHOOK_SECRET;
+  const relaxed = process.env.DODO_WEBHOOK_RELAXED === "true";
+
+  if (!webhookSecret && !relaxed) {
+    const cid = crypto.randomUUID();
+    console.warn(`[webhook][${cid}] DODO_WEBHOOK_SECRET not set`);
+    return jsonWithCID(cid, { error: "Webhook secret not configured" }, 500);
+  }
+
+  let payload: any = {};
+  let cid: string = crypto.randomUUID();
+
+  if (!relaxed) {
+    if (!svixId || !svixTimestamp || !svixSignature) {
+      console.error("❌ Missing webhook headers (svix-id/timestamp/signature)");
+      return jsonWithCID(cid, { error: "Missing webhook headers" }, 400);
+    }
+    try {
+      const wh = new Webhook(webhookSecret as string);
+      payload = wh.verify(rawBody, {
+        "svix-id": svixId,
+        "svix-timestamp": svixTimestamp,
+        "svix-signature": svixSignature,
+      }) as any;
+      console.log(`[webhook][${cid}] ✅ Signature verified`);
+    } catch (err) {
+      console.error(`[webhook][${cid}] ❌ Signature verification failed`);
+      console.error("Error details:", err);
+      console.error("Secret (first 10):", (webhookSecret || "").substring(0, 10) + "...");
+      console.error("svix-id:", svixId);
+      console.error("svix-timestamp:", svixTimestamp);
+      console.error("svix-signature:", first20(svixSignature || ""));
+      return jsonWithCID(
+        cid,
+        { error: "Invalid signature", hint: "Ensure DODO_WEBHOOK_SECRET matches Dashboard signing secret" },
+        400,
+      );
+    }
+  } else {
+    try {
+      payload = JSON.parse(rawBody);
+      console.warn(`[webhook][${cid}] ⚠️ Relaxed mode: signature verification DISABLED`);
+    } catch (err) {
+      console.error(`[webhook][${cid}] Invalid JSON in relaxed mode`, err);
+      return jsonWithCID(cid, { error: "Invalid payload" }, 400);
+    }
+  }
+
+  const eventType = payload?.type;
+  const payloadType = payload?.data?.payload_type;
+  const eventId = payload?.event_id || payload?.id || null;
+
+  // Prefer eventId as correlation id when available
+  if (eventId) cid = String(eventId);
+
+  // Idempotency de-dupe
+  if (isDuplicateEvent(eventId)) {
+    console.log(`[webhook][${cid}] 🔁 Duplicate event received, ignoring`);
+    return jsonWithCID(cid, { received: true, duplicate: true }, 200);
+  }
+
+  console.log(`[webhook][${cid}] 📊 Event`, {
+    type: eventType,
+    payloadType,
+    eventId,
+    email: payload?.data?.customer?.email,
+    subscriptionId: payload?.data?.subscription_id,
+    paymentId: payload?.data?.payment_id,
+    checkoutSessionId: payload?.data?.checkout_session_id,
+  });
+
+  // Helper function to update user subscription in both Clerk and Database
+  const updateUserSubscription = async (email: string, subscriptionData: any) => {
+    try {
+      const anyClerk = clerkClient as any;
+      const client = typeof anyClerk === "function" ? await anyClerk() : anyClerk;
+      const users = await client.users.getUserList({ emailAddress: [email] });
+
+      if (users.data.length === 0) {
+        console.warn(`[webhook][${cid}] No Clerk user found for email: ${email}`);
+        return;
+      }
+
+      const user = users.data[0];
+
+      // Update Clerk metadata
+      await client.users.updateUserMetadata(user.id, {
+        publicMetadata: {
+          subscription: subscriptionData,
+        },
+      });
+
+      // Persist to DB
+      await upsertSubscription({
+        clerk_user_id: user.id,
+        email,
+        status: subscriptionData.status,
+        plan: subscriptionData.plan,
+        subscription_id: subscriptionData.subscriptionId,
+        product_id: subscriptionData.productId,
+        payment_id: subscriptionData.paymentId,
+        last_event_type: eventType,
+        last_event_id: eventId,
+      });
+
+      console.log(`[webhook][${cid}] ✅ Updated subscription for user ${user.id}`, subscriptionData);
+    } catch (error) {
+      console.error(`[webhook][${cid}] ❌ Error updating subscription`, error);
+      // Do not throw; still acknowledge to avoid retries storm
+    }
+  };
+
   try {
-    // Read raw body (required for signature verification)
-    const rawBody = await req.text();
-
-    console.log('📨 Webhook received - Headers:', {
-      'webhook-id': req.headers.get("webhook-id"),
-      'webhook-timestamp': req.headers.get("webhook-timestamp"),
-      'webhook-signature': req.headers.get("webhook-signature")?.substring(0, 20) + '...',
-    });
-
-    // Get webhook headers (Dodo uses webhook-* not svix-*)
-    const webhookId = req.headers.get("webhook-id");
-    const webhookTimestamp = req.headers.get("webhook-timestamp");
-    const webhookSignature = req.headers.get("webhook-signature");
-
-    const webhookSecret = process.env.DODO_WEBHOOK_SECRET;
-    const relaxed = process.env.DODO_WEBHOOK_RELAXED === 'true';
-
-    if (!webhookSecret && !relaxed) {
-      console.warn("DODO_WEBHOOK_SECRET not set.");
-      return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
-    }
-
-    // Verify the webhook signature using Svix (strict mode) or parse JSON (relaxed/dev mode)
-    let payload: any = {};
-    if (!relaxed) {
-      if (!webhookId || !webhookTimestamp || !webhookSignature) {
-        console.error("❌ Missing webhook headers");
-        return NextResponse.json({ error: "Missing webhook headers" }, { status: 400 });
-      }
-      try {
-        const wh = new Webhook(webhookSecret as string);
-        // Map Dodo's webhook-* headers to Svix's expected svix-* format
-        payload = wh.verify(rawBody, {
-          "svix-id": webhookId,
-          "svix-timestamp": webhookTimestamp,
-          "svix-signature": webhookSignature,
-        }) as any;
-        console.log('✅ Webhook signature verified successfully');
-      } catch (err) {
-        console.error("❌ Webhook signature verification failed!");
-        console.error("Error details:", err);
-        console.error("Secret being used (first 10 chars):", (webhookSecret || "").substring(0, 10) + "...");
-        console.error("Webhook ID:", webhookId);
-        console.error("Webhook Timestamp:", webhookTimestamp);
-        console.error("Webhook Signature (first 20 chars):", webhookSignature?.substring(0, 20) + "...");
-        console.error("");
-        console.error("🔧 TO FIX:");
-        console.error("1. Go to Dodo Dashboard → Webhooks");
-        console.error("2. Copy the Signing Secret");
-        console.error("3. Update DODO_WEBHOOK_SECRET in Vercel env vars");
-        console.error("4. Redeploy the app");
-        console.error("");
-        return NextResponse.json({
-          error: "Invalid signature",
-          hint: "Check DODO_WEBHOOK_SECRET in Vercel matches Dodo Dashboard"
-        }, { status: 400 });
-      }
-    } else {
-      try {
-        payload = JSON.parse(rawBody);
-        console.warn("⚠️ DODO_WEBHOOK_RELAXED=true: Signature verification is DISABLED for this request.");
-      } catch (err) {
-        console.error("Invalid JSON payload in relaxed mode:", err);
-        return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
-      }
-    }
-
-    // Basic routing by type/payload_type (examples taken from docs listings)
-    const eventType = payload?.type; // e.g., "payment.succeeded"
-    const payloadType = payload?.data?.payload_type; // "Payment" | "Subscription" | "Refund" | "Dispute" | "LicenseKey"
-
-    // TODO: Add idempotency dedupe here (e.g., store event_id in DB and ignore duplicates)
-    const eventId = payload?.event_id || payload?.id || null;
-
-    console.log('📊 Webhook Event:', {
-      type: eventType,
-      payloadType,
-      eventId,
-      email: payload?.data?.customer?.email,
-      subscriptionId: payload?.data?.subscription_id,
-      paymentId: payload?.data?.payment_id,
-      checkoutSessionId: payload?.data?.checkout_session_id,
-    });
-
-    // Helper function to update user subscription in both Clerk and Database
-    const updateUserSubscription = async (email: string, subscriptionData: any) => {
-      try {
-        const anyClerk = clerkClient as any;
-        const client = typeof anyClerk === 'function' ? await anyClerk() : anyClerk;
-        const users = await client.users.getUserList({ emailAddress: [email] });
-
-        if (users.data.length === 0) {
-          console.warn(`No Clerk user found for email: ${email}`);
-          return;
-        }
-
-        const user = users.data[0];
-
-        // Update Clerk metadata (for backward compatibility)
-        await client.users.updateUserMetadata(user.id, {
-          publicMetadata: {
-            subscription: subscriptionData,
-          },
-        });
-
-        // CRITICAL: Save to database for reliable persistence
-        await upsertSubscription({
-          clerk_user_id: user.id,
-          email: email,
-          status: subscriptionData.status,
-          plan: subscriptionData.plan,
-          subscription_id: subscriptionData.subscriptionId,
-          product_id: subscriptionData.productId,
-          payment_id: subscriptionData.paymentId,
-          last_event_type: eventType,
-          last_event_id: eventId,
-        });
-
-        console.log(`✅ Updated subscription for user ${user.id} in both Clerk and Database:`, subscriptionData);
-      } catch (error) {
-        console.error("❌ Error updating user subscription:", error);
-        // Log but don't throw - we still want to return 200 to Dodo
-      }
-    };
-
     switch (eventType) {
       case "payment.succeeded": {
         const email = payload?.data?.customer?.email;
@@ -153,28 +186,22 @@ export async function POST(req: NextRequest) {
         const paymentId = payload?.data?.payment_id;
         const checkoutSessionId = payload?.data?.checkout_session_id;
 
-        // Handle missing product_id - try to infer from checkout session or subscription
         if (!productId && checkoutSessionId) {
-          console.log('⚠️ product_id missing, checkout_session_id:', checkoutSessionId);
-          // Note: In a real scenario, you'd query Dodo API to get session details
-          // For now, we'll default to monthly
+          console.log(`[webhook][${cid}] ⚠️ product_id missing, checkout_session_id=${checkoutSessionId}`);
+          // Optionally fetch session details via API if needed
         }
 
         if (email) {
-          // Determine plan type from product ID
-          let plan: 'monthly' | 'yearly' = 'monthly';
+          let plan: "monthly" | "yearly" = "monthly";
           if (productId === process.env.NEXT_PUBLIC_DODO_PRODUCT_YEARLY) {
-            plan = 'yearly';
+            plan = "yearly";
           } else if (!productId) {
-            // If product_id is missing, default to monthly
-            console.warn('⚠️ product_id is null/missing, defaulting to monthly plan');
-            plan = 'monthly';
+            console.warn(`[webhook][${cid}] ⚠️ product_id null, defaulting to monthly`);
+            plan = "monthly";
           }
 
-          console.log(`💰 Processing payment for ${email}: plan=${plan}, productId=${productId || 'null'}`);
-
           await updateUserSubscription(email, {
-            status: 'active',
+            status: "active",
             plan,
             subscriptionId: payload?.data?.subscription_id || paymentId,
             productId: productId || null,
@@ -182,7 +209,7 @@ export async function POST(req: NextRequest) {
             updatedAt: new Date().toISOString(),
           });
         }
-        console.log("✅ payment.succeeded", { eventId, payloadType, id: paymentId, email });
+        console.log(`[webhook][${cid}] ✅ payment.succeeded`, { eventId, payloadType, id: payload?.data?.payment_id });
         break;
       }
       case "payment.failed": {
@@ -191,21 +218,19 @@ export async function POST(req: NextRequest) {
         const paymentId = payload?.data?.payment_id;
 
         if (email) {
-          let plan = 'monthly';
-          if (productId === process.env.NEXT_PUBLIC_DODO_PRODUCT_YEARLY) {
-            plan = 'yearly';
-          }
+          let plan = "monthly";
+          if (productId === process.env.NEXT_PUBLIC_DODO_PRODUCT_YEARLY) plan = "yearly";
 
           updateUserSubscription(email, {
-            status: 'failed',
+            status: "failed",
             plan,
             subscriptionId: payload?.data?.subscription_id || paymentId,
             productId,
             paymentId,
             updatedAt: new Date().toISOString(),
-          }).catch((e: any) => console.error("updateUserSubscription error:", e));
+          }).catch((e: any) => console.error(`[webhook][${cid}] updateUserSubscription error:`, e));
         }
-        console.log("payment.failed", { eventId, payloadType, id: payload?.data?.payment_id });
+        console.log(`[webhook][${cid}] payment.failed`, { eventId, payloadType, id: payload?.data?.payment_id });
         break;
       }
       case "subscription.active": {
@@ -214,21 +239,19 @@ export async function POST(req: NextRequest) {
         const subscriptionId = payload?.data?.subscription_id;
 
         if (email) {
-          let plan = 'monthly';
-          if (productId === process.env.NEXT_PUBLIC_DODO_PRODUCT_YEARLY) {
-            plan = 'yearly';
-          }
+          let plan = "monthly";
+          if (productId === process.env.NEXT_PUBLIC_DODO_PRODUCT_YEARLY) plan = "yearly";
 
           updateUserSubscription(email, {
-            status: 'active',
+            status: "active",
             plan,
             subscriptionId,
             productId,
             paymentId: null,
             updatedAt: new Date().toISOString(),
-          }).catch((e: any) => console.error("updateUserSubscription error:", e));
+          }).catch((e: any) => console.error(`[webhook][${cid}] updateUserSubscription error:`, e));
         }
-        console.log("✅ subscription.active", { eventId, payloadType, id: subscriptionId });
+        console.log(`[webhook][${cid}] ✅ subscription.active`, { eventId, payloadType, id: subscriptionId });
         break;
       }
       case "subscription.renewed": {
@@ -237,13 +260,13 @@ export async function POST(req: NextRequest) {
 
         if (email) {
           updateUserSubscription(email, {
-            status: 'active',
+            status: "active",
             subscriptionId,
             paymentId: null,
             updatedAt: new Date().toISOString(),
-          }).catch((e: any) => console.error("updateUserSubscription error:", e));
+          }).catch((e: any) => console.error(`[webhook][${cid}] updateUserSubscription error:`, e));
         }
-        console.log("✅ subscription.renewed", { eventId, payloadType, id: subscriptionId });
+        console.log(`[webhook][${cid}] ✅ subscription.renewed`, { eventId, payloadType, id: subscriptionId });
         break;
       }
       case "subscription.cancelled":
@@ -254,17 +277,17 @@ export async function POST(req: NextRequest) {
 
         if (email) {
           updateUserSubscription(email, {
-            status: eventType.replace('subscription.', '') as any,
+            status: eventType.replace("subscription.", "") as any,
             subscriptionId,
             paymentId: null,
             updatedAt: new Date().toISOString(),
-          }).catch((e: any) => console.error("updateUserSubscription error:", e));
+          }).catch((e: any) => console.error(`[webhook][${cid}] updateUserSubscription error:`, e));
         }
-        console.log(`⚠️ ${eventType}`, { eventId, payloadType, id: subscriptionId });
+        console.log(`[webhook][${cid}] ⚠️ ${eventType}`, { eventId, payloadType, id: subscriptionId });
         break;
       }
       case "subscription.on_hold": {
-        console.log("subscription.on_hold", { eventId, payloadType, id: payload?.data?.subscription_id });
+        console.log(`[webhook][${cid}] subscription.on_hold`, { eventId, payloadType, id: payload?.data?.subscription_id });
         break;
       }
       case "subscription.plan_changed": {
@@ -273,69 +296,72 @@ export async function POST(req: NextRequest) {
         const subscriptionId = payload?.data?.subscription_id;
 
         if (email) {
-          let plan = 'monthly';
-          if (productId === process.env.NEXT_PUBLIC_DODO_PRODUCT_YEARLY) {
-            plan = 'yearly';
-          }
+          let plan = "monthly";
+          if (productId === process.env.NEXT_PUBLIC_DODO_PRODUCT_YEARLY) plan = "yearly";
 
           updateUserSubscription(email, {
-            status: 'active',
+            status: "active",
             plan,
             subscriptionId,
             productId,
             paymentId: null,
             updatedAt: new Date().toISOString(),
-          }).catch((e: any) => console.error("updateUserSubscription error:", e));
+          }).catch((e: any) => console.error(`[webhook][${cid}] updateUserSubscription error:`, e));
         }
-        console.log("subscription.plan_changed", { eventId, payloadType, id: subscriptionId });
+        console.log(`[webhook][${cid}] subscription.plan_changed`, { eventId, payloadType, id: subscriptionId });
         break;
       }
       case "refund.succeeded":
-      case "refund.failed":
-        console.log(eventType, { eventId, payloadType, id: payload?.data?.refund_id });
+      case "refund.failed": {
+        console.log(`[webhook][${cid}] ${eventType}`, { eventId, payloadType, id: payload?.data?.refund_id });
         break;
+      }
       case "dispute.opened":
       case "dispute.expired":
       case "dispute.accepted":
       case "dispute.cancelled":
       case "dispute.challenged":
       case "dispute.won":
-      case "dispute.lost":
-        console.log(eventType, { eventId, payloadType, id: payload?.data?.dispute_id });
+      case "dispute.lost": {
+        console.log(`[webhook][${cid}] ${eventType}`, { eventId, payloadType, id: payload?.data?.dispute_id });
         break;
-      case "license_key.created":
-        console.log(eventType, { eventId, payloadType, id: payload?.data?.id });
+      }
+      case "license_key.created": {
+        console.log(`[webhook][${cid}] ${eventType}`, { eventId, payloadType, id: payload?.data?.id });
         break;
-      default:
-        console.log("Unhandled event", { eventType, payloadType, eventId });
+      }
+      default: {
+        console.log(`[webhook][${cid}] Unhandled event`, { eventType, payloadType, eventId });
         break;
+      }
     }
 
-    // Always return 200 quickly so Dodo does not retry unnecessarily
-    return NextResponse.json({ received: true });
-  } catch (err) {
-    console.error("Webhook handler error:", err);
-    // Return 500 for unexpected errors; Dodo may retry delivery
-    return NextResponse.json({ error: "Webhook handler error" }, { status: 500 });
+    // Always acknowledge quickly
+    return jsonWithCID(cid, { received: true }, 200);
+  } catch (err: any) {
+    const cid = crypto.randomUUID();
+    console.error(`[webhook][${cid}] Handler error`, err);
+    return jsonWithCID(cid, { error: "Webhook handler error" }, 500);
   }
 }
 
 /**
  * Simple health check to validate deployment & env wiring
- * Doesn’t expose secrets; safe to call from browser or Dodo dashboard manually.
  */
 export async function GET() {
-  const mode = process.env.DODO_WEBHOOK_RELAXED === 'true' ? 'relaxed' : 'strict';
+  const mode = process.env.DODO_WEBHOOK_RELAXED === "true" ? "relaxed" : "strict";
   const secretConfigured = !!process.env.DODO_WEBHOOK_SECRET;
   const serviceRoleConfigured = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const cid = crypto.randomUUID();
 
-  return NextResponse.json({
+  return jsonWithCID(cid, {
     ok: true,
     mode,
     secretConfigured,
     serviceRoleConfigured,
-    note: mode === 'relaxed'
-      ? 'Relaxed mode disables signature verification (dev only). Turn off in production.'
-      : 'Strict mode verifies Svix signatures.',
+    note:
+      mode === "relaxed"
+        ? "Relaxed mode disables signature verification (dev only). Turn off in production."
+        : "Strict mode verifies Svix signatures.",
   });
 }
