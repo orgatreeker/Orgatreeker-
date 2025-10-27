@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
-import { Menu, Sparkles } from "lucide-react"
+import { Menu, Crown } from "lucide-react"
 
 interface NavigationProps {
   activeTab: string
@@ -101,8 +101,8 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
           {/* Show Pro badge for subscribed users, Pricing button for others */}
           {!isCheckingSubscription && (
             isSubscribed ? (
-              <Badge className="bg-gradient-to-r from-primary to-orange-500 text-white border-0 px-3 py-1 text-xs font-semibold">
-                <Sparkles className="h-3 w-3" />
+              <Badge className="bg-amber-500 text-white border-0 px-3 py-1 text-xs font-semibold">
+                <Crown className="h-3 w-3" />
                 Pro
               </Badge>
             ) : (
@@ -167,8 +167,8 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                   {!isCheckingSubscription && (
                     isSubscribed ? (
                       <div className="flex items-center justify-start px-3 py-2">
-                        <Badge className="bg-gradient-to-r from-primary to-orange-500 text-white border-0 px-3 py-1 text-xs font-semibold">
-                          <Sparkles className="h-3 w-3" />
+                        <Badge className="bg-amber-500 text-white border-0 px-3 py-1 text-xs font-semibold">
+                          <Crown className="h-3 w-3" />
                           Pro
                         </Badge>
                       </div>
