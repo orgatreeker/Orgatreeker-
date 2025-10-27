@@ -79,7 +79,7 @@ export default function PricingClient() {
         <EnhancedPricing
           plans={plans}
           title="Take Control of Your Finances Today"
-          description="Join thousands of users who are already managing their money smarter. Start your free trial — no credit card required!"
+          description="Join thousands of users who are already managing their money smarter. Start your free trial today!"
           onPlanSelect={(planId) => handleCheckout(planId)}
           loadingPlanId={loadingPlanId}
         />
