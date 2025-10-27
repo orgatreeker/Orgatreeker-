@@ -152,18 +152,18 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
     <div className="space-y-6">
       {error && <div className="bg-destructive/15 text-destructive px-4 py-2 rounded-md">{error}</div>}
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <h1 className="text-3xl font-bold tracking-tight">Income</h1>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-wrap items-center gap-2 md:gap-4">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Income</h1>
           <MonthPicker />
           {isPremium && (
-            <Badge className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
+            <Badge className="bg-amber-500 text-white">
               <Crown className="w-3 h-3 mr-1" />
               Pro
             </Badge>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           {!isPremium && incomeSources.length >= 4 && (
             <Badge variant="outline" className="text-xs">
               {incomeSources.length}/5 sources used
@@ -171,7 +171,7 @@ export function IncomePage({ isPremium = false }: IncomePageProps) {
           )}
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button onClick={() => handleOpenDialog()} disabled={!isPremium && incomeSources.length >= 5}>
+              <Button onClick={() => handleOpenDialog()} disabled={!isPremium && incomeSources.length >= 5} className="flex-1 md:flex-initial">
                 <Plus className="mr-2 h-4 w-4" />
                 Add Income Source
               </Button>

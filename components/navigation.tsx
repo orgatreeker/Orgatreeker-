@@ -193,8 +193,8 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                     </SignUpButton>
                   </SignedOut>
                   <SignedIn>
-                    <div className="flex items-center justify-between p-2">
-                      <span className="text-sm font-medium">Account</span>
+                    <div className="flex items-center gap-2 p-2">
+                      <span className="text-sm font-medium flex-1">Account</span>
                       <UserButton afterSignOutUrl="/" />
                     </div>
                   </SignedIn>

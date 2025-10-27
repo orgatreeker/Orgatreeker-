@@ -144,12 +144,12 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Settings</h1>
         <Badge variant="secondary">Account Settings</Badge>
       </div>
 
-      <div className="grid gap-6">
+      <div className="grid gap-6 max-w-full overflow-hidden">
         {/* Preferences */}
         <Card>
           <CardHeader>
@@ -160,7 +160,7 @@ export function SettingsPage() {
             <CardDescription>Customize your app experience and regional settings</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-0.5">
                 <Label className="text-base">Currency</Label>
                 <p className="text-sm text-muted-foreground">Choose your preferred currency for displaying amounts</p>
@@ -172,7 +172,7 @@ export function SettingsPage() {
                   if (currency) setCurrency(currency)
                 }}
               >
-                <SelectTrigger className="w-[280px]">
+                <SelectTrigger className="w-full sm:w-[280px]">
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent className="max-h-[300px]">
@@ -192,7 +192,7 @@ export function SettingsPage() {
 
             <Separator />
 
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-0.5">
                 <Label className="text-base flex items-center gap-2">
                   {theme === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
