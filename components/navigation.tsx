@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { SignInButton, SignUpButton, SignedIn, SignedOut, UserButton, useUser } from "@clerk/nextjs"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Menu, Sparkles } from "lucide-react"
 
 interface NavigationProps {
   activeTab: string
@@ -15,6 +16,8 @@ interface NavigationProps {
 
 export function Navigation({ activeTab, onTabChange }: NavigationProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isSubscribed, setIsSubscribed] = useState(false)
+  const [isCheckingSubscription, setIsCheckingSubscription] = useState(true)
   const { user } = useUser()
 
   const handleTabChange = (tab: string) => {
@@ -26,6 +29,29 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
     if (!user) return "Guest"
     return user.firstName || user.fullName || user.username || "User"
   }
+
+  // Check subscription status
+  useEffect(() => {
+    const checkSubscription = async () => {
+      if (!user?.id) {
+        setIsCheckingSubscription(false)
+        return
+      }
+
+      try {
+        const response = await fetch('/api/check-subscription')
+        const data = await response.json()
+        setIsSubscribed(data.isSubscribed || false)
+      } catch (error) {
+        console.error('Error checking subscription:', error)
+        setIsSubscribed(false)
+      } finally {
+        setIsCheckingSubscription(false)
+      }
+    }
+
+    checkSubscription()
+  }, [user?.id])
 
   const navigationItems = [
     { value: "dashboard", label: "Dashboard" },
@@ -72,10 +98,19 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
 
         {/* Auth Buttons - Desktop */}
         <div className="hidden md:flex items-center gap-3">
-          {/* Pricing is visible to both signed-in and signed-out users */}
-          <Link href="/pricing">
-            <Button variant="ghost" size="sm">Pricing</Button>
-          </Link>
+          {/* Show Pro badge for subscribed users, Pricing button for others */}
+          {!isCheckingSubscription && (
+            isSubscribed ? (
+              <Badge className="bg-gradient-to-r from-primary to-orange-500 text-white border-0 px-3 py-1 text-xs font-semibold">
+                <Sparkles className="h-3 w-3" />
+                Pro
+              </Badge>
+            ) : (
+              <Link href="/pricing">
+                <Button variant="ghost" size="sm">Pricing</Button>
+              </Link>
+            )
+          )}
 
           <SignedOut>
             <SignInButton mode="redirect">
@@ -128,10 +163,21 @@ export function Navigation({ activeTab, onTabChange }: NavigationProps) {
                     </Button>
                   ))}
 
-                  {/* Link to Pricing page */}
-                  <Button asChild variant="ghost" className="w-full justify-start">
-                    <Link href="/pricing">Pricing</Link>
-                  </Button>
+                  {/* Show Pro badge for subscribed users, Pricing button for others */}
+                  {!isCheckingSubscription && (
+                    isSubscribed ? (
+                      <div className="flex items-center justify-start px-3 py-2">
+                        <Badge className="bg-gradient-to-r from-primary to-orange-500 text-white border-0 px-3 py-1 text-xs font-semibold">
+                          <Sparkles className="h-3 w-3" />
+                          Pro
+                        </Badge>
+                      </div>
+                    ) : (
+                      <Button asChild variant="ghost" className="w-full justify-start">
+                        <Link href="/pricing">Pricing</Link>
+                      </Button>
+                    )
+                  )}
                 </div>
 
                 {/* Mobile Auth Section */}
