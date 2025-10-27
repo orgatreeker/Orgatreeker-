@@ -49,7 +49,7 @@ export function EnhancedPricing({
         <div className="flex items-center justify-center gap-6 mt-6 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <Check className="h-4 w-4 text-green-500" />
-            <span>No credit card required</span>
+            <span>Start free trial today</span>
           </div>
           <div className="flex items-center gap-2">
             <Check className="h-4 w-4 text-green-500" />
@@ -57,7 +57,7 @@ export function EnhancedPricing({
           </div>
           <div className="flex items-center gap-2">
             <Check className="h-4 w-4 text-green-500" />
-            <span>Money-back guarantee</span>
+            <span>Secure payment processing</span>
           </div>
         </div>
       </div>
@@ -180,10 +180,10 @@ export function EnhancedPricing({
                   )}
                 </Button>
 
-                {/* No Card Required Text */}
+                {/* Trial Info Text */}
                 {!isCustom && (
                   <p className="text-xs text-center text-muted-foreground">
-                    No credit card required for trial
+                    Start your free trial now
                   </p>
                 )}
 

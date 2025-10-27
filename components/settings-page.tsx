@@ -326,23 +326,18 @@ export function SettingsPage() {
               <HelpCircle className="h-5 w-5" />
               Help & Support
             </CardTitle>
-            <CardDescription>Get help and contact support</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
-              <Button variant="outline" className="h-auto p-4 flex flex-col items-center gap-2 bg-transparent">
-                <HelpCircle className="h-6 w-6" />
-                <span>Help Center</span>
-              </Button>
-              <Button variant="outline" className="h-auto p-4 flex flex-col items-center gap-2 bg-transparent">
-                <Mail className="h-6 w-6" />
-                <span>Contact Support</span>
-              </Button>
-              <Button variant="outline" className="h-auto p-4 flex flex-col items-center gap-2 bg-transparent">
-                <Globe className="h-6 w-6" />
-                <span>Community</span>
-              </Button>
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Need help?{" "}
+              <a
+                href="mailto:support@orgatreeker.com"
+                className="text-primary hover:underline font-medium inline-flex items-center gap-1"
+              >
+                <Mail className="h-4 w-4" />
+                Contact Support
+              </a>
+            </p>
           </CardContent>
         </Card>
       </div>
